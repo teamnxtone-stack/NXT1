@@ -172,11 +172,16 @@ async def _workflow_recovery_loop():
     """Sweep MongoDB for workflows stuck in 'running' state with no live
     process and re-spawn them. Runs once on boot, then every 5 minutes."""
     from services.workflow_service import resume_orphaned_workflows
+    from services.agent_runs_worker import resume_orphaned_runs
     while True:
         try:
             await resume_orphaned_workflows()
         except Exception as e:
             logger.warning(f"workflow recovery tick failed: {e}")
+        try:
+            await resume_orphaned_runs()
+        except Exception as e:
+            logger.warning(f"agent run recovery tick failed: {e}")
         await asyncio.sleep(300)
 
 

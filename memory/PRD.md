@@ -1,3 +1,30 @@
+## 2026-05-14 — Phases F + G shipped
+
+### Phase G — Durable agent_runs worker
+- New `services/agent_runs_worker.py` — `execute_run(run_id)` drives a queued run via the shared provider registry (Claude / OpenAI / Emergent / etc.), streams tokens, persists output + assistant message, and emits a bell notification on terminal transition.
+- Cooperative cancel: every 10 chunks checks `status == "cancelling"` and bails clean.
+- `spawn_run(run_id)` registers each task in `_RUNNING_RUNS` so the recovery sweeper doesn't double-spawn.
+- `resume_orphaned_runs()` mirrors `resume_orphaned_workflows` — sweeps Mongo every 5min for `queued`/`running` runs with no live task, re-spawns them, fails anything >24h stale.
+- `routes/agent_threads.py` now calls `spawn_run` from `create_thread` (initial message), `create_run`, and `fork_run`.
+- `server.py::_workflow_recovery_loop` also calls `resume_orphaned_runs` on each tick.
+- Verified: created a thread with `first_message="Say HELLO and only that"` → 8s later run status=completed, output=`HELLO`, logs show start + completion.
+
+### Phase F — Vercel + Coolify + Caddy auto-domain
+- New helpers in `services/domain_service.py`:
+  - `vercel_attach_domain(project_name, hostname)` → `POST /v10/projects/{name}/domains` with the bearer token; surfaces DNS instructions from `/v6/domains/{name}/config`. 409 (already attached) treated as success.
+  - `vercel_remove_domain` — clean teardown on domain delete.
+  - `coolify_attach_domain(hostname)` → `POST /api/v1/applications/{uuid}/domains` against `COOLIFY_BASE_URL`.
+  - `detect_deploy_host_provider()` returns `vercel | coolify | caddy | manual` based on env config.
+- `routes/domains.py::add_domain` now also calls the right platform attach after Cloudflare DNS setup, storing `deploy_provider` and `platform_meta` (vercel verified flag, DNS instructions, errors) on the domain record.
+- `routes/domains.py::remove_domain` mirrors removal on Vercel.
+- New `GET /api/domains/config` — surfaces `{deploy_provider, vercel, coolify, cloudflare_dns, manual}` so the frontend can render the right "Auto-attach" CTA copy.
+- Env vars to set on user's host: `VERCEL_TOKEN` (or `COOLIFY_API_TOKEN` + `COOLIFY_APP_UUID` + optional `COOLIFY_BASE_URL`, or `CADDY_AUTO_HTTPS=1` for self-hosted Caddy auto-HTTPS).
+
+### Verified
+- `GET /api/domains/config` returns `{deploy_provider: "manual", vercel: false, coolify: false, ...}` (no keys in preview env — correct).
+- Agent run end-to-end: create thread + first_message → poll → output stored.
+
+
 ## 2026-05-14 — Phases A–E shipped (stabilization brief)
 
 ### Phase A — Stop the bleeding

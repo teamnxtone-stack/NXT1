@@ -101,6 +101,11 @@ async def create_thread(body: ThreadCreate, user_id: str = Depends(verify_token)
             {"id": thread_id},
             {"$set": {"last_run_id": run["id"], "run_count": 1, "status": "running", "updated_at": _now()}},
         )
+        try:
+            from services.agent_runs_worker import spawn_run
+            spawn_run(run["id"])
+        except Exception as e:
+            logger.warning(f"could not spawn agent run: {e}")
     return doc
 
 
@@ -265,4 +270,9 @@ async def fork_run(run_id: str, body: RunCreate, user_id: str = Depends(verify_t
         {"$set": {"last_run_id": new_run["id"], "status": "running", "updated_at": _now()},
          "$inc": {"run_count": 1}},
     )
+    try:
+        from services.agent_runs_worker import spawn_run
+        spawn_run(new_run["id"])
+    except Exception as e:
+        logger.warning(f"could not spawn forked run: {e}")
     return new_run

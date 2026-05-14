@@ -242,3 +242,138 @@ def cf_check_ssl(hostname: str, zone_id: Optional[str] = None) -> dict:
         return {"status": "active" if data.get("result", {}).get("enabled") else "inactive"}
     except Exception as e:  # noqa: BLE001
         return {"status": "unknown", "error": str(e)}
+
+
+
+# ─── Phase F — Vercel + Coolify auto-domain attachment ──────────────────
+# Vercel: official REST endpoints
+#   POST /v10/projects/{idOrName}/domains       attach domain
+#   GET  /v6/domains/{domain}/config            verify config / get DNS instructions
+#
+# Coolify: official REST endpoint (Coolify v4+)
+#   POST /api/v1/applications/{uuid}/domains    attach domain to a Coolify app
+#
+# Caddy: no API needed — auto-HTTPS via on-demand TLS picks up new hosts
+# automatically when its `auto_https` + `on_demand_tls` are enabled. We
+# expose a no-op success here so the UI flow stays consistent.
+
+VERCEL_API = "https://api.vercel.com"
+COOLIFY_API_DEFAULT = "https://app.coolify.io"
+
+
+def vercel_configured() -> bool:
+    return bool(os.environ.get("VERCEL_TOKEN", "").strip())
+
+
+def _vercel_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {os.environ['VERCEL_TOKEN'].strip()}",
+        "Content-Type": "application/json",
+    }
+
+
+def vercel_attach_domain(project_name: str, hostname: str) -> dict:
+    """Attach a domain to a Vercel project. Returns {ok, dns_instructions?, error?}."""
+    if not vercel_configured():
+        return {"ok": False, "error": "VERCEL_TOKEN not set"}
+    try:
+        r = requests.post(
+            f"{VERCEL_API}/v10/projects/{project_name}/domains",
+            headers=_vercel_headers(),
+            json={"name": hostname},
+            timeout=15,
+        )
+        if r.status_code >= 400:
+            try:
+                err = r.json().get("error", {}).get("message")
+            except Exception:
+                err = r.text[:200]
+            # 409 = already exists; treat as success
+            if r.status_code == 409:
+                return {"ok": True, "attached": True, "note": "already attached"}
+            return {"ok": False, "error": f"{r.status_code}: {err}"}
+        data = r.json()
+        # Pull DNS instructions for manual DNS users
+        cfg = vercel_domain_config(hostname)
+        return {
+            "ok": True,
+            "attached": True,
+            "domain": data.get("name"),
+            "verified": data.get("verified", False),
+            "dns_instructions": cfg,
+        }
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
+def vercel_domain_config(hostname: str) -> dict:
+    """Pull DNS instructions for a Vercel-managed domain."""
+    if not vercel_configured():
+        return {"error": "VERCEL_TOKEN not set"}
+    try:
+        r = requests.get(
+            f"{VERCEL_API}/v6/domains/{hostname}/config",
+            headers=_vercel_headers(),
+            timeout=12,
+        )
+        if r.status_code >= 400:
+            return {"error": f"{r.status_code}: {r.text[:200]}"}
+        return r.json()
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+
+
+def vercel_remove_domain(project_name: str, hostname: str) -> dict:
+    if not vercel_configured():
+        return {"ok": False, "error": "VERCEL_TOKEN not set"}
+    try:
+        r = requests.delete(
+            f"{VERCEL_API}/v9/projects/{project_name}/domains/{hostname}",
+            headers=_vercel_headers(),
+            timeout=12,
+        )
+        return {"ok": r.status_code < 400, "status": r.status_code}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
+# ─── Coolify (self-hosted) ─────────────────────────────────────────────
+def coolify_configured() -> bool:
+    return bool(
+        os.environ.get("COOLIFY_API_TOKEN", "").strip()
+        and os.environ.get("COOLIFY_APP_UUID", "").strip()
+    )
+
+
+def coolify_attach_domain(hostname: str) -> dict:
+    if not coolify_configured():
+        return {"ok": False, "error": "COOLIFY_API_TOKEN / COOLIFY_APP_UUID not set"}
+    base = (os.environ.get("COOLIFY_BASE_URL") or COOLIFY_API_DEFAULT).rstrip("/")
+    uuid_ = os.environ["COOLIFY_APP_UUID"].strip()
+    try:
+        r = requests.post(
+            f"{base}/api/v1/applications/{uuid_}/domains",
+            headers={"Authorization": f"Bearer {os.environ['COOLIFY_API_TOKEN'].strip()}",
+                     "Content-Type": "application/json"},
+            json={"domain": hostname},
+            timeout=15,
+        )
+        if r.status_code >= 400:
+            return {"ok": False, "error": f"{r.status_code}: {r.text[:200]}"}
+        return {"ok": True, "attached": True}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
+def detect_deploy_host_provider() -> str:
+    """Returns 'vercel' | 'coolify' | 'caddy' | 'manual' based on env config.
+
+    Used by the /domains/add route to pick the right attachment flow."""
+    if vercel_configured():
+        return "vercel"
+    if coolify_configured():
+        return "coolify"
+    # Caddy auto-HTTPS — no API needed; just confirm the deploy host points at us.
+    if (os.environ.get("CADDY_AUTO_HTTPS") or "").strip().lower() in ("1", "true", "yes"):
+        return "caddy"
+    return "manual"
