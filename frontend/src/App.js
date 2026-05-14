@@ -27,6 +27,7 @@ import AgentsPage from "@/pages/AgentsPage";
 import AgentOSPage from "@/pages/AgentOSPage";
 import SocialPage from "@/pages/workspace/SocialPage";
 import StudioPage from "@/pages/workspace/StudioPage";
+import MemoryPage from "@/pages/workspace/MemoryPage";
 import { useAgentActivityWatcher } from "@/lib/agentActivity";
 import {
   WorkspaceDeployments,
@@ -104,6 +105,7 @@ function App() {
           <Route path="agentos" element={<AgentOSPage />} />
           <Route path="social" element={<SocialPage />} />
           <Route path="studio" element={<StudioPage />} />
+          <Route path="memory" element={<MemoryPage />} />
         </Route>
         <Route
           path="/builder/:projectId"

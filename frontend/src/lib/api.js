@@ -394,6 +394,14 @@ export const socialSetAutopilot = (payload) => api.post("/social/autopilot", pay
 // Video Studio (2026-05-14)
 // ─────────────────────────────────────────────────────────────────────────
 export const videoHealth = () => api.get("/video/health");
+export const videoListModels = () => api.get("/video/models");
+export const videoUploadReference = (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.post("/video/upload-reference", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
 export const videoGenerate = (payload) => api.post("/video/generate", payload);
 export const videoUpload = (file) => {
   const fd = new FormData();
@@ -408,6 +416,8 @@ export const videoListJobs = (limit = 20) => api.get("/video/jobs", { params: { 
 export const videoSaveTimeline = (payload) => api.post("/video/timeline", payload);
 export const videoListTimelines = () => api.get("/video/timelines");
 export const videoGetTimeline = (id) => api.get(`/video/timeline/${id}`);
+export const videoExport = (payload) => api.post("/video/export", payload);
+export const videoListExports = () => api.get("/video/exports");
 export const videoPostToSocial = (payload) => api.post("/video/post-to-social", payload);
 
 // Generic jobs polling

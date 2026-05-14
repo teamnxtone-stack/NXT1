@@ -13,15 +13,16 @@
  * Mobile collapses the timeline into a vertical clip-list and keeps the
  * Export / Post buttons fixed at the bottom.
  */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, Sparkles, Loader2, Play, Trash2, Download, Send,
-  Film, X, ChevronRight, Check, Plus,
+  Film, X, ChevronRight, Check, Plus, Image as ImageIcon, Wand2,
 } from "lucide-react";
 import {
   videoUpload, videoListClips, videoDeleteClip, videoGenerate,
-  videoListJobs, videoHealth, videoPostToSocial, mediaUrl,
+  videoListJobs, videoHealth, videoPostToSocial, videoListModels,
+  videoUploadReference, videoExport, mediaUrl,
 } from "@/lib/api";
 import useJobProgress, { rememberJob, recallJob, forgetJob } from "@/hooks/useJobProgress";
 
@@ -104,19 +105,32 @@ export default function StudioPage() {
     setTimeline((t) => t.filter((cid) => cid !== id));
   };
 
-  const onExport = () => {
-    if (!activeClip) {
-      alert("Add a clip to the timeline first.");
+  const [exporting, setExporting] = useState(false);
+
+  const onExport = async () => {
+    if (timeline.length === 0) {
+      alert("Add at least one clip to the timeline first.");
       return;
     }
-    // v1: download the active clip directly. Multi-clip stitching uses
-    // ffmpeg.wasm in v2 (heavy dep — gated behind a feature flag).
-    const a = document.createElement("a");
-    a.href = mediaUrl(activeClip.url);
-    a.download = `nxt1-studio-${activeClip.id.slice(0, 8)}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    setExporting(true);
+    try {
+      const { data } = await videoExport({
+        clip_ids: timeline,
+        name: `nxt1-export-${new Date().toISOString().slice(0, 16)}`,
+      });
+      // Trigger download
+      const url = mediaUrl(data.url);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${data.name || "nxt1-studio"}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -165,14 +179,17 @@ export default function StudioPage() {
           <button
             type="button"
             onClick={onExport}
+            disabled={exporting || timeline.length === 0}
             data-testid="studio-export-btn"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-medium transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-medium transition disabled:opacity-50"
             style={{
               background: "var(--nxt-accent)",
               color: "#0F1117",
             }}
           >
-            <Download size={12} /> Export MP4
+            {exporting
+              ? <><Loader2 size={12} className="animate-spin" /> Stitching…</>
+              : <><Download size={12} /> Export MP4</>}
           </button>
           <input
             ref={fileRef}
@@ -436,16 +453,58 @@ export default function StudioPage() {
 }
 
 function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
+  const [models, setModels] = useState([]);
+  const [model, setModel] = useState("cogvideox-5b");
+  const [mode, setMode] = useState("t2v");
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("realistic");
   const [duration, setDuration] = useState(5);
+  const [refImg, setRefImg] = useState(null); // {id, url}
+  const [refUploading, setRefUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const refInput = useRef(null);
+
+  useEffect(() => {
+    videoListModels().then(({ data }) => {
+      setModels(data.items || []);
+    }).catch(() => {});
+  }, []);
+
+  const selectedMeta = useMemo(() => models.find((m) => m.id === model), [models, model]);
+  const supportedModes = selectedMeta?.supports || ["t2v"];
+  const durationChoices = selectedMeta?.duration_choices || [5];
+
+  useEffect(() => {
+    if (!supportedModes.includes(mode)) setMode(supportedModes[0]);
+    if (!durationChoices.includes(duration)) setDuration(durationChoices[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, models]);
+
+  const onPickRef = async (file) => {
+    if (!file) return;
+    setRefUploading(true);
+    try {
+      const { data } = await videoUploadReference(file);
+      setRefImg({ id: data.id, url: data.url });
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Reference upload failed");
+    } finally {
+      setRefUploading(false);
+    }
+  };
 
   const onSubmit = async () => {
     if (!prompt.trim()) return;
+    if (mode === "i2v" && !refImg?.id) {
+      alert("Image-to-video needs a reference image. Upload one above.");
+      return;
+    }
     setSubmitting(true);
     try {
-      const { data } = await videoGenerate({ prompt, style, duration_s: duration });
+      const { data } = await videoGenerate({
+        prompt, style, duration_s: duration, model, mode,
+        reference_image_id: mode === "i2v" ? refImg.id : undefined,
+      });
       onJobStart(data.job_id);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to start AI video generation");
@@ -457,9 +516,7 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
   return (
     <>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50"
         style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
         onClick={onClose}
@@ -469,7 +526,7 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="fixed top-0 bottom-0 right-0 z-50 w-[92vw] max-w-[420px] flex flex-col"
+        className="fixed top-0 bottom-0 right-0 z-50 w-[94vw] max-w-[460px] flex flex-col"
         style={{
           background: "var(--nxt-bg-2)",
           borderLeft: "1px solid var(--nxt-border)",
@@ -496,17 +553,151 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
                    border: "1px solid rgba(251, 113, 133, 0.32)",
                    color: "var(--nxt-error)",
                  }}>
-              FAL_API_KEY is not configured. Add it to <code>/app/backend/.env</code> and restart the backend.
+              FAL_API_KEY not configured. Add it to <code>backend/.env</code> and restart backend.
             </div>
           )}
+
+          {/* Mode toggle */}
+          <div className="flex rounded-lg overflow-hidden"
+               style={{ border: "1px solid var(--nxt-border)" }}>
+            {[
+              { id: "t2v", label: "Text → Video", icon: Wand2 },
+              { id: "i2v", label: "Image → Video", icon: ImageIcon },
+            ].map(({ id, label, icon: Icon }) => {
+              const enabled = supportedModes.includes(id);
+              const active = mode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={!enabled}
+                  onClick={() => setMode(id)}
+                  data-testid={`studio-mode-${id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-[12px] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: active ? "var(--nxt-accent)" : "transparent",
+                    color: active ? "#0F1117" : "var(--nxt-fg-dim)",
+                  }}
+                >
+                  <Icon size={12} /> {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Model picker */}
+          <div>
+            <span className="block text-[11px] mb-1.5 mono tracking-[0.16em] uppercase"
+                  style={{ color: "var(--nxt-text-3)" }}>Model</span>
+            <div className="space-y-1">
+              {models.map((m) => {
+                const active = m.id === model;
+                const tierColor = {
+                  premium: "var(--nxt-accent)",
+                  "fast-pro": "#34d399",
+                  fast: "#60a5fa",
+                  default: "var(--nxt-fg-dim)",
+                }[m.tier] || "var(--nxt-fg-dim)";
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setModel(m.id)}
+                    data-testid={`studio-model-${m.id}`}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg transition"
+                    style={{
+                      background: active ? "var(--nxt-surface-3)" : "var(--nxt-surface)",
+                      border: `1px solid ${active ? "var(--nxt-accent)" : "var(--nxt-border)"}`,
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12.5px] flex items-center gap-1.5"
+                           style={{ color: "var(--nxt-fg)" }}>
+                        {m.label}
+                        <span className="mono text-[9px] uppercase tracking-wider px-1.5 rounded"
+                              style={{ background: "var(--nxt-bg-2)", color: tierColor }}>
+                          {m.tier}
+                        </span>
+                      </div>
+                      <div className="text-[10.5px] truncate"
+                           style={{ color: "var(--nxt-text-3)" }}>
+                        {m.notes}
+                      </div>
+                    </div>
+                    {active && <Check size={12} style={{ color: "var(--nxt-accent)" }} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Reference image (i2v) */}
+          {mode === "i2v" && (
+            <div>
+              <span className="block text-[11px] mb-1.5 mono tracking-[0.16em] uppercase"
+                    style={{ color: "var(--nxt-text-3)" }}>Reference image</span>
+              <div className="flex items-center gap-3">
+                {refImg ? (
+                  <div className="relative h-20 w-20 rounded-lg overflow-hidden"
+                       style={{ background: "var(--nxt-panel)" }}>
+                    <img src={mediaUrl(refImg.url)} alt="ref"
+                         className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setRefImg(null)}
+                      data-testid="studio-ref-clear"
+                      className="absolute top-0.5 right-0.5 h-5 w-5 grid place-items-center rounded-full"
+                      style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => refInput.current?.click()}
+                    data-testid="studio-ref-upload-btn"
+                    className="h-20 w-20 grid place-items-center rounded-lg transition"
+                    style={{
+                      background: "var(--nxt-surface)",
+                      border: "1.5px dashed var(--nxt-border-strong)",
+                      color: "var(--nxt-fg-dim)",
+                    }}
+                  >
+                    {refUploading
+                      ? <Loader2 size={18} className="animate-spin" />
+                      : <Upload size={18} />}
+                  </button>
+                )}
+                <p className="text-[11px] flex-1"
+                   style={{ color: "var(--nxt-text-3)" }}>
+                  Drop a still and the AI will animate it. PNG/JPG/WEBP, up to 10 MB.
+                </p>
+              </div>
+              <input
+                ref={refInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                data-testid="studio-ref-input"
+                onChange={(e) => e.target.files?.[0] && onPickRef(e.target.files[0])}
+              />
+            </div>
+          )}
+
+          {/* Prompt */}
           <label className="block">
             <span className="block text-[11px] mb-1 mono tracking-[0.16em] uppercase"
-                  style={{ color: "var(--nxt-text-3)" }}>Describe your video</span>
+                  style={{ color: "var(--nxt-text-3)" }}>
+              {mode === "i2v" ? "Motion / action prompt" : "Describe your video"}
+            </span>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              placeholder="A product demo showing our app on a phone, clean background"
+              rows={3}
+              placeholder={mode === "i2v"
+                ? "The camera slowly pushes in. Subject gestures with their hand."
+                : "A product demo showing our app on a phone, clean background"}
               data-testid="studio-ai-prompt"
               className="w-full bg-transparent outline-none text-[13.5px] py-2.5 px-3 rounded-lg resize-none leading-relaxed"
               style={{
@@ -517,10 +708,11 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
             />
           </label>
 
+          {/* Style */}
           <div>
             <span className="block text-[11px] mb-1.5 mono tracking-[0.16em] uppercase"
                   style={{ color: "var(--nxt-text-3)" }}>Style</span>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
               {STYLES.map((s) => (
                 <button
                   key={s.id}
@@ -538,11 +730,12 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
             </div>
           </div>
 
+          {/* Duration */}
           <div>
             <span className="block text-[11px] mb-1.5 mono tracking-[0.16em] uppercase"
                   style={{ color: "var(--nxt-text-3)" }}>Duration</span>
             <div className="flex gap-1.5">
-              {DURATIONS.map((d) => (
+              {durationChoices.map((d) => (
                 <button
                   key={d}
                   type="button"
@@ -560,7 +753,7 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
           </div>
 
           <p className="text-[11px]" style={{ color: "var(--nxt-text-3)" }}>
-            Runs on Fal.ai CogVideoX-5B. Typical wait: 30–90 seconds.
+            Runs on Fal.ai. Typical wait: 30–180 seconds depending on model.
             The job runs in the background — you can close this tab and come back.
           </p>
         </div>
@@ -568,7 +761,8 @@ function AiGenerateDrawer({ falConfigured, onClose, onJobStart }) {
           <button
             type="button"
             onClick={onSubmit}
-            disabled={!prompt.trim() || submitting || !falConfigured}
+            disabled={!prompt.trim() || submitting || !falConfigured ||
+                      (mode === "i2v" && !refImg?.id)}
             data-testid="studio-ai-submit"
             className="w-full h-11 rounded-full inline-flex items-center justify-center gap-1.5 text-[14px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: "var(--nxt-accent)", color: "#0F1117" }}

@@ -28,6 +28,7 @@ import {
   Bot,
   Megaphone,
   Film,
+  Brain,
 } from "lucide-react";
 import Brand from "@/components/Brand";
 import { clearToken } from "@/lib/auth";
@@ -106,6 +107,7 @@ function HamburgerDrawer({ onClose }) {
     { id: "apps",     label: "Apps",     icon: FileEdit,     onClick: () => go("/workspace/apps") },
     { id: "social",   label: "Social",   icon: Megaphone,    onClick: () => go("/workspace/social") },
     { id: "studio",   label: "Studio",   icon: Film,         onClick: () => go("/workspace/studio") },
+    { id: "memory",   label: "Memory",   icon: Brain,        onClick: () => go("/workspace/memory") },
     { id: "agents",   label: "Agents",   icon: SparklesIcon, onClick: () => go("/workspace/agents") },
     { id: "agentos",  label: "AgentOS",  icon: Bot,          onClick: () => go("/agentos") },
     { id: "account",  label: "Account",  icon: User,         onClick: () => go("/workspace/account") },

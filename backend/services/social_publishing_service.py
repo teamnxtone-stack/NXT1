@@ -315,32 +315,99 @@ async def _publish_instagram(conn: dict, post: dict, media_url: Optional[str]) -
 
 
 async def _publish_linkedin(conn: dict, post: dict, media_url: Optional[str]) -> dict:
+    """LinkedIn UGC post — supports an optional image via register-upload + upload binary."""
     token = conn["access_token"]
     author = f"urn:li:person:{conn['account_id']}"
     text = _caption_with_tags(post, max_tags=5)
-    payload: dict = {
-        "author": author,
-        "lifecycleState": "PUBLISHED",
-        "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {"text": text},
-                "shareMediaCategory": "NONE",
-            }
-        },
-        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
-    }
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "X-Restli-Protocol-Version": "2.0.0",
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        # Note: with media we'd need register-upload first. Text-only for v1.
+
+    media_urn: Optional[str] = None
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        if media_url:
+            try:
+                # 1) Download the image bytes
+                img_bytes = (await client.get(media_url)).content
+                # 2) registerUpload
+                reg = await client.post(
+                    "https://api.linkedin.com/v2/assets?action=registerUpload",
+                    headers=headers,
+                    json={
+                        "registerUploadRequest": {
+                            "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                            "owner": author,
+                            "serviceRelationships": [
+                                {"relationshipType": "OWNER",
+                                 "identifier": "urn:li:userGeneratedContent"}
+                            ],
+                        }
+                    },
+                )
+                reg.raise_for_status()
+                rj = reg.json()["value"]
+                upload_url = rj["uploadMechanism"][
+                    "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+                ]["uploadUrl"]
+                media_urn = rj["asset"]
+                # 3) Binary upload to the returned URL
+                up = await client.put(upload_url, content=img_bytes,
+                                      headers={"Authorization": f"Bearer {token}"})
+                up.raise_for_status()
+            except Exception as e:
+                logger.warning(f"LinkedIn image upload failed, falling back to text-only: {e}")
+                media_urn = None
+
+        if media_urn:
+            share_content = {
+                "shareCommentary": {"text": text},
+                "shareMediaCategory": "IMAGE",
+                "media": [{
+                    "status": "READY",
+                    "media": media_urn,
+                    "description": {"text": post.get("topic", "")[:200]},
+                    "title": {"text": (post.get("topic") or "Post")[:80]},
+                }],
+            }
+        else:
+            share_content = {
+                "shareCommentary": {"text": text},
+                "shareMediaCategory": "NONE",
+            }
+
+        payload = {
+            "author": author,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {"com.linkedin.ugc.ShareContent": share_content},
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+        }
         r = await client.post("https://api.linkedin.com/v2/ugcPosts",
                               headers=headers, json=payload)
         r.raise_for_status()
         urn = r.headers.get("x-restli-id") or r.json().get("id")
-        return {"ok": True, "platform_post_id": urn, "url": "https://www.linkedin.com/feed/"}
+        return {"ok": True, "platform_post_id": urn,
+                "url": "https://www.linkedin.com/feed/"}
+
+
+async def _twitter_upload_media(token: str, image_bytes: bytes) -> Optional[str]:
+    """X v1.1 media/upload — yes, even with OAuth 2.0 bearer this is accepted."""
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            files = {"media": ("image.png", image_bytes, "application/octet-stream")}
+            r = await client.post(
+                "https://upload.twitter.com/1.1/media/upload.json",
+                headers={"Authorization": f"Bearer {token}"},
+                files=files,
+            )
+            if r.status_code >= 300:
+                logger.warning(f"X media upload non-200: {r.status_code} {r.text[:200]}")
+                return None
+            return str(r.json().get("media_id_string") or "")
+    except Exception as e:
+        logger.warning(f"X media upload failed: {e}")
+        return None
 
 
 async def _publish_twitter(conn: dict, post: dict, media_url: Optional[str]) -> dict:
@@ -348,10 +415,23 @@ async def _publish_twitter(conn: dict, post: dict, media_url: Optional[str]) -> 
     text = _caption_with_tags(post, max_tags=3)
     if len(text) > 280:
         text = text[:277] + "…"
+
+    media_id: Optional[str] = None
+    if media_url:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                img_bytes = (await client.get(media_url)).content
+            media_id = await _twitter_upload_media(token, img_bytes)
+        except Exception as e:
+            logger.warning(f"X image fetch failed: {e}")
+
+    body: dict = {"text": text}
+    if media_id:
+        body["media"] = {"media_ids": [media_id]}
     async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(
             "https://api.twitter.com/2/tweets",
-            json={"text": text},
+            json=body,
             headers={"Authorization": f"Bearer {token}",
                      "Content-Type": "application/json"},
         )

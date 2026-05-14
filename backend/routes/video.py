@@ -1,15 +1,25 @@
 """Video Studio routes.
 
-POST /api/video/generate           → AI text-to-video via Fal.ai (returns job_id)
+GET  /api/video/models             → list available Fal models + capabilities
+POST /api/video/upload-reference   → upload a still (png/jpg/webp) for image-to-video
+GET  /api/video/refs/{filename}    → serve reference image
+
+POST /api/video/generate           → AI gen via Fal (model + mode + optional ref image)
 POST /api/video/upload             → upload mp4/mov clip
-GET  /api/video/clips              → list user's clips
-GET  /api/video/clips/{filename}   → serve file
-DELETE /api/video/clips/{id}       → delete
+GET  /api/video/clips              → list clips
+GET  /api/video/clips/{filename}   → serve clip
+DELETE /api/video/clips/{id}       → delete clip
 GET  /api/video/jobs               → list video jobs
-POST /api/video/timeline           → save timeline (project)
-GET  /api/video/timeline/{id}      → load timeline
-GET  /api/video/timelines          → list timelines
-POST /api/video/post-to-social     → send clip to social (creates a draft post)
+
+POST /api/video/timeline           → save timeline
+GET  /api/video/timelines          → list
+GET  /api/video/timeline/{id}      → load
+
+POST /api/video/export             → server-side ffmpeg stitch → mp4
+GET  /api/video/exports/{filename} → serve stitched mp4
+GET  /api/video/exports            → list user's exports
+
+POST /api/video/post-to-social     → drop into Social calendar as draft
 """
 import asyncio
 import logging
@@ -24,10 +34,10 @@ from pydantic import BaseModel, Field
 
 from services import job_service
 from services.video_studio_service import (
-    CLIPS_DIR,
-    EXPORTS_DIR,
-    run_video_job,
-    save_uploaded_clip,
+    CLIPS_DIR, EXPORTS_DIR, REF_IMG_DIR,
+    MODEL_REGISTRY, list_models,
+    run_video_job, save_uploaded_clip, save_reference_image,
+    export_timeline,
 )
 
 from ._deps import db, verify_token
@@ -38,15 +48,23 @@ router = APIRouter(prefix="/api/video", tags=["video"])
 
 class GenerateBody(BaseModel):
     prompt: str = Field(..., min_length=2, max_length=2000)
-    style: str = Field(default="realistic")     # realistic | animated | demo
+    style: str = Field(default="realistic")     # realistic | animated | demo | moody | vlog
     duration_s: int = Field(default=5, ge=2, le=15)
+    model: str = Field(default="cogvideox-5b")
+    mode: str = Field(default="t2v")            # t2v | i2v
+    reference_image_id: Optional[str] = None    # required when mode=i2v
 
 
 class TimelineBody(BaseModel):
     name: str = Field(default="Untitled")
-    tracks: list = Field(default_factory=list)   # opaque JSON the FE owns
+    tracks: list = Field(default_factory=list)
     aspect: str = Field(default="16:9")
     duration_s: float = Field(default=10.0)
+
+
+class ExportBody(BaseModel):
+    clip_ids: list[str]
+    name: str = "export"
 
 
 class PostToSocialBody(BaseModel):
@@ -60,15 +78,67 @@ class PostToSocialBody(BaseModel):
 async def health(_user: str = Depends(verify_token)):
     return {
         "fal_configured": bool(os.environ.get("FAL_API_KEY")),
+        "ffmpeg_available": bool(os.popen("which ffmpeg").read().strip()),
         "ok": True,
     }
 
 
-# ---------------------------------------------------------------- generate
+@router.get("/models")
+async def get_models(_user: str = Depends(verify_token)):
+    return {"items": list_models()}
+
+
+# ─────────────────────────────────────────────────── reference images
+@router.post("/upload-reference")
+async def upload_reference(
+    file: UploadFile = File(...),
+    user_id: str = Depends(verify_token),
+):
+    if not file.filename:
+        raise HTTPException(400, "No file")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(400, "Max 10MB")
+    try:
+        doc = await save_reference_image(user_id, content, file.filename)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.video_references.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/refs/{filename}")
+async def get_ref(filename: str):
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "Bad filename")
+    p = REF_IMG_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Not found")
+    return FileResponse(str(p))
+
+
+# ─────────────────────────────────────────────────── generate
 @router.post("/generate")
 async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
     if not os.environ.get("FAL_API_KEY"):
         raise HTTPException(400, "FAL_API_KEY is not configured. Add it via Settings → Integrations.")
+    if body.model not in MODEL_REGISTRY:
+        raise HTTPException(400, f"Unknown model. Available: {list(MODEL_REGISTRY)}")
+    meta = MODEL_REGISTRY[body.model]
+    if not meta.get(body.mode):
+        raise HTTPException(400, f"Model '{body.model}' does not support '{body.mode}'.")
+
+    ref_path = None
+    if body.mode == "i2v":
+        if not body.reference_image_id:
+            raise HTTPException(400, "Image-to-video requires reference_image_id.")
+        ref = await db.video_references.find_one(
+            {"user_id": user_id, "id": body.reference_image_id}, {"_id": 0}
+        )
+        if not ref:
+            raise HTTPException(404, "Reference image not found.")
+        ref_path = ref["file_path"]
 
     job = await job_service.start(
         db,
@@ -78,7 +148,7 @@ async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
         initial_logs=[{
             "ts": job_service._now(),
             "level": "info",
-            "msg": f"AI video generation queued: {body.prompt[:80]}",
+            "msg": f"AI video queued: model={body.model} mode={body.mode} prompt={body.prompt[:60]}",
         }],
     )
     asyncio.create_task(run_video_job(
@@ -87,11 +157,14 @@ async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
         prompt=body.prompt,
         style=body.style,
         duration_s=body.duration_s,
+        model=body.model,
+        mode=body.mode,
+        reference_image_path=ref_path,
     ))
     return {"job_id": job["id"], "status": "running"}
 
 
-# ---------------------------------------------------------------- upload
+# ─────────────────────────────────────────────────── upload + clips
 @router.post("/upload")
 async def upload_clip(file: UploadFile = File(...), user_id: str = Depends(verify_token)):
     if not file.filename:
@@ -108,7 +181,6 @@ async def upload_clip(file: UploadFile = File(...), user_id: str = Depends(verif
     return clip
 
 
-# ---------------------------------------------------------------- clips
 @router.get("/clips")
 async def list_clips(limit: int = 100, user_id: str = Depends(verify_token)):
     cur = db.video_clips.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(
@@ -140,7 +212,7 @@ async def delete_clip(clip_id: str, user_id: str = Depends(verify_token)):
     return {"ok": True}
 
 
-# ---------------------------------------------------------------- jobs
+# ─────────────────────────────────────────────────── jobs
 @router.get("/jobs")
 async def list_jobs(limit: int = 20, user_id: str = Depends(verify_token)):
     cur = db.jobs.find(
@@ -150,19 +222,14 @@ async def list_jobs(limit: int = 20, user_id: str = Depends(verify_token)):
     return {"items": [d async for d in cur]}
 
 
-# ---------------------------------------------------------------- timeline
+# ─────────────────────────────────────────────────── timeline
 @router.post("/timeline")
 async def save_timeline(body: TimelineBody, user_id: str = Depends(verify_token)):
     tid = str(uuid.uuid4())
     doc = {
-        "id": tid,
-        "user_id": user_id,
-        "name": body.name,
-        "tracks": body.tracks,
-        "aspect": body.aspect,
-        "duration_s": body.duration_s,
-        "created_at": job_service._now(),
-        "updated_at": job_service._now(),
+        "id": tid, "user_id": user_id, "name": body.name, "tracks": body.tracks,
+        "aspect": body.aspect, "duration_s": body.duration_s,
+        "created_at": job_service._now(), "updated_at": job_service._now(),
     }
     await db.video_timelines.insert_one(dict(doc))
     doc.pop("_id", None)
@@ -183,7 +250,37 @@ async def get_timeline(tid: str, user_id: str = Depends(verify_token)):
     return doc
 
 
-# ---------------------------------------------------------------- post to social
+# ─────────────────────────────────────────────────── server-side export
+@router.post("/export")
+async def export(body: ExportBody, user_id: str = Depends(verify_token)):
+    try:
+        doc = await export_timeline(db, user_id, body.clip_ids, name=body.name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.exception("export failed")
+        raise HTTPException(500, f"Export failed: {e}")
+    return doc
+
+
+@router.get("/exports")
+async def list_exports(user_id: str = Depends(verify_token)):
+    cur = db.video_exports.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(50)
+    return {"items": [d async for d in cur]}
+
+
+@router.get("/exports/{filename}")
+async def get_export(filename: str):
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "Bad filename")
+    p = EXPORTS_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Not found")
+    return FileResponse(str(p), media_type="video/mp4",
+                        filename=f"nxt1-studio-{filename}")
+
+
+# ─────────────────────────────────────────────────── post to social
 @router.post("/post-to-social")
 async def post_to_social(body: PostToSocialBody, user_id: str = Depends(verify_token)):
     clip = await db.video_clips.find_one({"id": body.clip_id, "user_id": user_id}, {"_id": 0})
