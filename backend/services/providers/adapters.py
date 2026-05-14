@@ -469,28 +469,19 @@ class EmergentProvider(BaseProvider):
     )
 
     async def generate(self, system_prompt: str, user_prompt: str, session_id: str) -> str:
-        """Route the universal-key request through the Emergent gateway via
-        emergentintegrations. On self-host, users typically configure a
-        direct provider key (ANTHROPIC_API_KEY / OPENAI_API_KEY / …) which
-        bypasses this provider entirely — so this code path is only hit in
-        the Emergent preview / when EMERGENT_LLM_KEY is the only key set.
+        """Emergent universal-key fallback is DISABLED.
+
+        We removed the `emergentintegrations` dependency to keep the platform
+        100% self-hostable on Render with zero coupling to Emergent's CDN /
+        billing. Configure ANTHROPIC_API_KEY or OPENAI_API_KEY instead.
         """
-        try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            target = "openai" if self.model.startswith("gpt") else "anthropic"
-            chat = LlmChat(
-                api_key=self.api_key,
-                session_id=session_id or "nxt1",
-                system_message=system_prompt,
-            ).with_model(target, self.model)
-            resp = await chat.send_message(UserMessage(text=user_prompt))
-            return resp or ""
-        except Exception as e:
-            self.mark_error(e)
-            raise _map_litellm_error(e)
+        from .errors import ProviderUnavailable
+        raise ProviderUnavailable(
+            "Emergent universal key is no longer supported. "
+            "Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment."
+        )
 
     async def generate_stream(self, system_prompt: str, user_prompt: str, session_id: str):
-        # Universal key has no real streaming — emit single chunk after generate.
         text = await self.generate(system_prompt, user_prompt, session_id)
         yield text
 
@@ -506,5 +497,5 @@ ALL_ADAPTERS = [
     GroqProvider,
     DeepSeekProvider,
     OpenRouterProvider,
-    EmergentProvider,
+    # EmergentProvider removed — Emergent dependency dropped.
 ]
