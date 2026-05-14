@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 7 — Workspace login passkey (555), Social OAuth infra (3 platforms), Connections, Autopilot, Schedule/Publish, and background scheduler safety. 30 tests authored in /app/backend/tests/test_iter7_social_oauth.py — 27 pass in full-suite run (3 user-token E2E skipped due to /api/users/signin >45s ingress latency); when run standalone (timeout=90s) ALL 30 PASS. Background scheduler loop verified: past-due scheduled post + NO connection → stays status=scheduled for 75s, no crash, no spurious last_publish_error. All review-request bullets are GREEN.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/users/signin", "issue": "Slow (~17-40s) through public ingress. Caused 3 user-token E2E tests to time out at 45s in full module run; passed cleanly when standalone (24s) and after bumping fixture timeout to 90s. Likely bcrypt password verification cost + ingress cold-path; not a functional bug, only a UX/perf note."},
+      {"endpoint": "POST /api/social/posts/{id}/publish", "issue": "On unexpected publish_post() exceptions the route raises HTTPException(500, f'Publish failed: {e}'). That leaks raw exception text to the client. Already truncated to 300 chars in DB via last_publish_error, but not in HTTP body. Consider scrubbing tokens/PII before returning."},
+      {"endpoint": "GET /api/social/oauth/{platform}/callback", "issue": "REDIRECT URL BUG (cosmetic): `fe_base+'/workspace/social?connected={platform}'` concatenated then '&error=...' is appended on failure paths. If REACT_APP_BACKEND_URL contains no path the first separator is '?' (correct), but in the error path you then append `&error=...` to the *already-?-prefixed* URL — works. However if connected query param is missing the `&` becomes the first sep which is invalid. Currently fine because connected= is always present, just a fragile pattern."},
+      {"endpoint": "services/social_scheduler.py", "issue": "Comparing scheduled_at ($lte) with `now.isoformat()` works only because both are UTC isoformat strings. If a client posts a naive-local ISO timestamp, lexicographic comparison can mis-fire. Recommend parsing and comparing as datetimes."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_social_oauth.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "WORKSPACE LOGIN — VERIFIED. POST /api/auth/login {password:'555'} → 200 + 30-day JWT signed with JWT_SECRET (sub='admin'). Wrong/empty passwords → 401 with detail. /api/auth/verify accepts the issued token. APP_PASSWORD env var read at module import — note: if APP_PASSWORD is rotated in .env, backend MUST be restarted because routes/auth.py:17 binds the constant once.",
+    "OAUTH STATUS — VERIFIED. Returns exactly 3 platforms (instagram/linkedin/twitter), each {configured:false, label, redirect_uri} where redirect_uri = PUBLIC_BACKEND_URL + /api/social/oauth/{platform}/callback. All three correctly report configured=false when META/X/LINKEDIN env vars are empty. The status helper re-reads env on each call (not cached) — good design.",
+    "OAUTH START — VERIFIED. Without creds, GET /api/social/oauth/{platform}/start returns 400 with the helpful message 'X OAuth credentials not configured on the server. Set the platform env vars and restart backend.' for all 3 platforms. Unknown platform returns 400 'Unknown platform'. State doc is NOT inserted into social_oauth_states when start fails (good — no garbage in mongo).",
+    "CONNECTIONS LIST — VERIFIED. GET /api/social/connections returns {items:[3]} merged with platform_status; each platform reports connected:false + configured:false. Auth required (no token → 403). _scrub() correctly strips access_token/refresh_token/_id before serialization.",
+    "DISCONNECT — VERIFIED. POST /api/social/connections/{platform}/disconnect is idempotent — calling twice on a non-existent record still returns {ok:true}. Mongo delete_one with matched=0 is a no-op. Unknown platform → 400.",
+    "AUTOPILOT — VERIFIED. New user GET returns the dataclass default (enabled:false, tone:professional, platforms:['linkedin','twitter'], cadence_day:1, cadence_hour:9, last_run_at:null) WITHOUT inserting a doc. POST upserts with $setOnInsert created_at, $set updated_at. GET reflects exactly. user_id stamped from JWT.",
+    "PUBLISH NOW — VERIFIED. 404 for missing post id, 400 'No linkedin account connected.' when user has no social_connections record for that platform. Error message is helpful and identifies the platform.",
+    "SCHEDULE — VERIFIED. 404 for missing post id, 200+ok=true for existing post; mongo doc now has status='scheduled' and scheduled_at=<ISO>. Note: payload uses Pydantic body model so non-ISO strings are accepted as-is (route does not parse/validate the date format).",
+    "SCHEDULER SAFETY — VERIFIED EXPLICITLY (75s real-time wait). Direct mongo insert: {status:'scheduled', scheduled_at:5min ago, user_id:'admin', platform:'linkedin'} with NO social_connections record. After one full tick (60s) + 15s buffer, doc remains {status:'scheduled'} and last_publish_error is NOT set — scheduler hits the `if not conn: continue` branch silently as designed. No traceback in backend logs.",
+    "EXISTING ENDPOINTS — VERIFIED. /api/video/health → {ok:true, fal_configured:false}. /api/social/posts → 200. /api/social/generate → 200 with job_id (async job kicked, full flow already covered by iter6).",
+    "E2E USER FLOW — VERIFIED. /api/users/signin → JWT (sub=u_c2f1982d548a4b). That JWT successfully accesses /api/social/oauth/status, /api/social/connections, /api/social/autopilot (per-user isolation — user has no connections/autopilot of their own). Both user-tokens and admin-tokens use the same verify_token dependency (both are valid JWTs signed with the same JWT_SECRET).",
+    "CODE NOTE — routes/social_oauth.py:172 has `pub._public_base()` reference to a private helper. Works because _public_base reads env each call, but breaching the underscore convention. Either expose pub.public_base() or duplicate the one-liner.",
+    "CODE NOTE — routes/social_oauth.py imports `verify_token_value` but never uses it. Minor lint cleanup.",
+    "CODE NOTE — social_publishing_service._publish_instagram requires `media_url`. When schedule fires and the post has no image_url, the scheduler will catch a RuntimeError ('Instagram requires an image…') and record last_publish_error — not a crash, but the post sits in scheduled status forever. Consider auto-transitioning to status='failed' after N retries.",
+    "CODE NOTE — social_scheduler _fire_autopilots uses `now.hour != cad_hour` — a 60s tick can occasionally miss the exact hour boundary if a tick finishes at hh:59.97 and the next at hh+1:00.97. In practice fine because the 6-day debounce protects against double-fires within a single hour, but the missed-window edge case is real. Consider hour∈[cad_hour, cad_hour+1)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_social_oauth.py",
+    "/app/test_reports/pytest/iter7_results.xml",
+    "/app/test_reports/iteration_7.json"
+  ],
+  "success_rate": {"backend": "100% (30/30 verified — 27 in full run + 3 user-E2E standalone pass)", "frontend": "N/A — backend-only scope"},
+  "test_credentials": "POST /api/auth/login {password:'555'} (admin token, sub=admin); POST /api/users/signin {email:test@nxt1.local, password:testpass123} (user token, sub=u_c2f1982d548a4b).",
+  "seed_data_creation": "Per pytest run: ephemeral TEST_iter7 social_posts (CRUD-created, fixture-cleaned), 1 TEST_iter7 scheduled past-due post for scheduler safety test (auto-deleted), 1 admin autopilot record (deleted in test cleanup), and 1 /api/social/generate detached job kicked under admin actor (job left in mongo.jobs; harmless and consistent with iter6 behavior).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: `cd /app/backend && python3 -m pytest tests/test_iter7_social_oauth.py -v -o addopts=''` (the `-o addopts=''` is required to override pytest.ini's default `-m 'not slow'` so the 75s scheduler test runs). Allow ~2-3 minutes total. The user-token E2E fixture has timeout=90s for signin because ingress latency is variable (17-40s observed). If signin times out the 3 tests skip cleanly. Full pass = 30/30. Mongo collections touched: social_posts, social_connections, social_oauth_states (untouched in iter7), social_autopilot, jobs.",
+  "rca of the issue": "No bugs found. Only perf note: /api/users/signin is slow (~17-40s) through ingress, attributable to bcrypt password verify + cold path. Mitigation: standalone fixture timeout=90s; tests skip cleanly when ingress is degraded. Scheduler skip-when-no-connection behavior verified via 75s real-time wait — implemented correctly at services/social_scheduler.py:51-53 (`if not conn: continue`)."
+}

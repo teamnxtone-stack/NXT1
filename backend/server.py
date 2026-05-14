@@ -74,6 +74,9 @@ from routes.agentos_v2 import router as agentos_v2_router  # noqa: E402
 # Social + Video Studio (2026-05-14)
 from routes.social import router as social_router  # noqa: E402
 from routes.video import router as video_router  # noqa: E402
+from routes.social_oauth import router as social_oauth_router  # noqa: E402
+from services.social_scheduler import scheduler_loop as social_scheduler_loop  # noqa: E402
+from routes._deps import db as _shared_db  # noqa: E402
 
 app = FastAPI(title="NXT1 API", version="0.6.0")
 
@@ -123,6 +126,7 @@ for r in (
     agentos_v2_router,
     social_router,
     video_router,
+    social_oauth_router,
 ):
     app.include_router(r)
 
@@ -142,6 +146,11 @@ async def on_startup():
         asyncio.create_task(rt_svc.idle_sweeper())
     except Exception as e:
         logger.warning(f"idle_sweeper not started: {e}")
+    try:
+        asyncio.create_task(social_scheduler_loop(_shared_db))
+        logger.info("social scheduler loop started")
+    except Exception as e:
+        logger.warning(f"social scheduler not started: {e}")
 
 
 @app.on_event("shutdown")

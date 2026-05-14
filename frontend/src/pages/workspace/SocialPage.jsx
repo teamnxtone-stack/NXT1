@@ -15,14 +15,17 @@ import {
   Sparkles, Send, Image as ImageIcon, Calendar as CalIcon,
   RefreshCw, Trash2, Check, Upload, ChevronDown, ChevronUp,
   Instagram, Linkedin, Twitter, Globe, Loader2, X,
+  Rocket, Clock as ClockIcon,
 } from "lucide-react";
 import {
   socialGetProfile, socialSaveProfile, socialUploadLogo,
   socialGenerate, socialListPosts, socialUpdatePost,
   socialDeletePost, socialRegeneratePost, socialListJobs,
+  socialPublishNow, socialSchedulePost,
   mediaUrl,
 } from "@/lib/api";
 import useJobProgress, { rememberJob, recallJob, forgetJob } from "@/hooks/useJobProgress";
+import ConnectionsAndAutopilot from "@/components/social/ConnectionsAndAutopilot";
 
 const TONES = ["professional", "founder", "casual", "personal"];
 const ALL_PLATFORMS = [
@@ -153,6 +156,38 @@ export default function SocialPage() {
   const onApprove = async (postId) => {
     const { data } = await socialUpdatePost(postId, { status: "approved" });
     setPosts((prev) => prev.map((p) => p.id === postId ? data : p));
+  };
+
+  const onPublishNow = async (postId) => {
+    if (!confirm("Publish this post to the live platform now?")) return;
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, _publishing: true } : p));
+    try {
+      await socialPublishNow(postId);
+      const { data } = await socialListPosts(
+        filterPlatform === "all" ? {} : { platform: filterPlatform }
+      );
+      setPosts(data.items || []);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Publish failed");
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, _publishing: false } : p));
+    }
+  };
+
+  const onSchedule = async (postId) => {
+    const when = prompt(
+      "When to publish? (ISO timestamp, e.g. 2026-05-20T14:00:00Z)",
+      new Date(Date.now() + 3600 * 1000).toISOString()
+    );
+    if (!when) return;
+    try {
+      await socialSchedulePost(postId, when);
+      const { data } = await socialListPosts(
+        filterPlatform === "all" ? {} : { platform: filterPlatform }
+      );
+      setPosts(data.items || []);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Schedule failed");
+    }
   };
 
   const onDelete = async (postId) => {
@@ -442,6 +477,10 @@ export default function SocialPage() {
                       )}
                     </div>
                   </Field>
+
+                  <div className="pt-2">
+                    <ConnectionsAndAutopilot />
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -500,6 +539,8 @@ export default function SocialPage() {
                 onRegenerate={() => onRegenerate(p.id)}
                 onApprove={() => onApprove(p.id)}
                 onDelete={() => onDelete(p.id)}
+                onPublish={() => onPublishNow(p.id)}
+                onSchedule={() => onSchedule(p.id)}
               />
             ))}
           </div>
@@ -521,10 +562,11 @@ function Field({ label, children }) {
   );
 }
 
-function PostCard({ post, onRegenerate, onApprove, onDelete }) {
+function PostCard({ post, onRegenerate, onApprove, onDelete, onPublish, onSchedule }) {
   const platformMeta = ALL_PLATFORMS.find((p) => p.id === post.platform) || ALL_PLATFORMS[1];
   const Icon = platformMeta.icon;
   const isApproved = post.status === "approved" || post.status === "scheduled" || post.status === "posted";
+  const isPosted = post.status === "posted";
 
   return (
     <article
@@ -545,7 +587,7 @@ function PostCard({ post, onRegenerate, onApprove, onDelete }) {
             loading="lazy"
           />
         )}
-        {post._regenerating && (
+        {(post._regenerating || post._publishing) && (
           <div className="absolute inset-0 grid place-items-center"
                style={{ background: "rgba(0,0,0,0.6)" }}>
             <Loader2 size={24} className="animate-spin"
@@ -565,7 +607,7 @@ function PostCard({ post, onRegenerate, onApprove, onDelete }) {
           <span
             className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] mono uppercase tracking-wider"
             style={{
-              background: "var(--nxt-accent)",
+              background: isPosted ? "var(--nxt-success)" : "var(--nxt-accent)",
               color: "#0F1117",
             }}
           >
@@ -583,39 +625,86 @@ function PostCard({ post, onRegenerate, onApprove, onDelete }) {
             {(post.hashtags || []).map((h) => `#${h}`).join(" ")}
           </p>
         )}
+        {post.last_publish_error && (
+          <p className="text-[10.5px] leading-snug"
+             style={{ color: "var(--nxt-error)" }}>
+            {post.last_publish_error}
+          </p>
+        )}
+        {isPosted && post.platform_url && (
+          <a
+            href={post.platform_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10.5px] underline"
+            style={{ color: "var(--nxt-accent)" }}
+          >
+            View live post ↗
+          </a>
+        )}
       </div>
-      <div className="flex items-center justify-between gap-1 px-2 py-2"
-           style={{ borderTop: "1px solid var(--nxt-border)" }}>
-        <button
-          type="button"
+      <div
+        className="grid grid-cols-5 gap-1 px-2 py-2"
+        style={{ borderTop: "1px solid var(--nxt-border)" }}
+      >
+        <IconBtn
+          icon={RefreshCw}
+          label="Regenerate"
           onClick={onRegenerate}
-          disabled={post._regenerating}
-          data-testid={`post-regen-${post.id}`}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-[11.5px] py-1.5 rounded-md transition hover:opacity-90 disabled:opacity-50"
-          style={{ color: "var(--nxt-fg-dim)" }}
-        >
-          <RefreshCw size={11} /> Regenerate
-        </button>
-        <button
-          type="button"
+          disabled={post._regenerating || isPosted}
+          testid={`post-regen-${post.id}`}
+          color="var(--nxt-fg-dim)"
+        />
+        <IconBtn
+          icon={Check}
+          label="Approve"
           onClick={onApprove}
           disabled={isApproved}
-          data-testid={`post-approve-${post.id}`}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-[11.5px] py-1.5 rounded-md transition hover:opacity-90 disabled:opacity-40"
-          style={{ color: isApproved ? "var(--nxt-success)" : "var(--nxt-accent)" }}
-        >
-          <Check size={11} /> Approve
-        </button>
-        <button
-          type="button"
+          testid={`post-approve-${post.id}`}
+          color="var(--nxt-success)"
+        />
+        <IconBtn
+          icon={ClockIcon}
+          label="Schedule"
+          onClick={onSchedule}
+          disabled={isPosted}
+          testid={`post-schedule-${post.id}`}
+          color="var(--nxt-info)"
+        />
+        <IconBtn
+          icon={Rocket}
+          label="Post now"
+          onClick={onPublish}
+          disabled={post._publishing || isPosted}
+          testid={`post-publish-${post.id}`}
+          color="var(--nxt-accent)"
+        />
+        <IconBtn
+          icon={Trash2}
+          label="Delete"
           onClick={onDelete}
-          data-testid={`post-delete-${post.id}`}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-md transition hover:opacity-90"
-          style={{ color: "var(--nxt-error)" }}
-        >
-          <Trash2 size={12} />
-        </button>
+          testid={`post-delete-${post.id}`}
+          color="var(--nxt-error)"
+        />
       </div>
     </article>
+  );
+}
+
+function IconBtn({ icon: Icon, label, onClick, disabled, testid, color }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testid}
+      title={label}
+      aria-label={label}
+      className="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-md transition hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px]"
+      style={{ color }}
+    >
+      <Icon size={13} />
+      <span className="text-[9.5px] leading-none">{label}</span>
+    </button>
   );
 }

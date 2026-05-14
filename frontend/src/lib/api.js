@@ -371,6 +371,18 @@ export const socialUpdatePost = (id, patch) => api.patch(`/social/posts/${id}`, 
 export const socialDeletePost = (id) => api.delete(`/social/posts/${id}`);
 export const socialRegeneratePost = (id) => api.post(`/social/posts/${id}/regenerate`);
 
+// Social OAuth + connections + publishing + autopilot
+export const socialOAuthStatus = () => api.get("/social/oauth/status");
+export const socialOAuthStart = (platform) => api.get(`/social/oauth/${platform}/start`);
+export const socialListConnections = () => api.get("/social/connections");
+export const socialDisconnect = (platform) =>
+  api.post(`/social/connections/${platform}/disconnect`);
+export const socialPublishNow = (postId) => api.post(`/social/posts/${postId}/publish`);
+export const socialSchedulePost = (postId, scheduledAt) =>
+  api.post(`/social/posts/${postId}/schedule`, { scheduled_at: scheduledAt });
+export const socialGetAutopilot = () => api.get("/social/autopilot");
+export const socialSetAutopilot = (payload) => api.post("/social/autopilot", payload);
+
 // ─────────────────────────────────────────────────────────────────────────
 // Video Studio (2026-05-14)
 // ─────────────────────────────────────────────────────────────────────────
