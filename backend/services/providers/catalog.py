@@ -42,7 +42,7 @@ VARIANTS: Dict[str, List[Dict]] = {
     "anthropic": [
         {"id": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5", "tier": "balanced",  "badge": "Pro",       "context": 200_000, "note": "Default flagship for code generation.", "recommended": True},
         {"id": "claude-opus-4-1-20250805",  "label": "Claude Opus 4.1",   "tier": "reasoning", "badge": "Reasoning", "context": 200_000, "note": "Reasoning-heavy work + long-context planning."},
-        {"id": "claude-haiku-4-5-20250929", "label": "Claude Haiku 4.5",  "tier": "fast",      "badge": "Fast",      "context": 200_000, "note": "Fast + cheap for narration, routing, and chips."},
+        {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5",  "tier": "fast",      "badge": "Fast",      "context": 200_000, "note": "Fast + cheap for narration, routing, and chips."},
     ],
     # ---------- Gemini ----------
     "gemini": [

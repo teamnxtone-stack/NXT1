@@ -118,7 +118,7 @@ class AnthropicProvider(BaseProvider):
         id="anthropic",
         display_name="Anthropic Claude",
         default_model="claude-sonnet-4-5-20250929",
-        models=["claude-sonnet-4-5-20250929", "claude-opus-4-1-20250805", "claude-haiku-4-5-20250929"],
+        models=["claude-sonnet-4-5-20250929", "claude-opus-4-1-20250805", "claude-haiku-4-5-20251001"],
         tier=LatencyTier.BALANCED,
         streaming=True,
         json_mode=False,
@@ -450,12 +450,12 @@ class EmergentProvider(BaseProvider):
         default_model="claude-sonnet-4-5-20250929",
         models=[
             "claude-sonnet-4-5-20250929",
-            "claude-haiku-4-5-20250929",
+            "claude-haiku-4-5-20251001",
             "gpt-4.1",
             "gpt-4o-mini",
         ],
         tier=LatencyTier.BALANCED,
-        streaming=False,  # Emergent universal key doesn't stream
+        streaming=True,
         json_mode=False,
         supports_vision=True,
         supports_tools=False,
@@ -469,21 +469,36 @@ class EmergentProvider(BaseProvider):
     )
 
     async def generate(self, system_prompt: str, user_prompt: str, session_id: str) -> str:
-        """Emergent universal-key fallback is DISABLED.
+        """Route via the Emergent universal-key proxy (OpenAI-compatible).
 
-        We removed the `emergentintegrations` dependency to keep the platform
-        100% self-hostable on Render with zero coupling to Emergent's CDN /
-        billing. Configure ANTHROPIC_API_KEY or OPENAI_API_KEY instead.
+        The proxy at `/llm` accepts the universal key as an OpenAI key and
+        forwards to the correct vendor based on the bare model name.
         """
-        from .errors import ProviderUnavailable
-        raise ProviderUnavailable(
-            "Emergent universal key is no longer supported. "
-            "Set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment."
+        from services.ai_service import _acomplete
+        target = (
+            "openai" if (self.model.startswith("gpt") or self.model.startswith("o"))
+            else "gemini" if self.model.startswith("gemini")
+            else "anthropic"
         )
+        try:
+            return await _acomplete(
+                provider=target,
+                model=self.model,
+                api_key=self.api_key,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+        except Exception as e:
+            raise _map_litellm_error(e)
 
     async def generate_stream(self, system_prompt: str, user_prompt: str, session_id: str):
-        text = await self.generate(system_prompt, user_prompt, session_id)
-        yield text
+        from services.ai_service import EmergentProvider as _AISvcEmergent
+        provider = _AISvcEmergent(api_key=self.api_key, model=self.model)
+        try:
+            async for delta in provider.generate_stream(system_prompt, user_prompt, session_id):
+                yield delta
+        except Exception as e:
+            raise _map_litellm_error(e)
 
 
 # ============================================================
@@ -497,5 +512,5 @@ ALL_ADAPTERS = [
     GroqProvider,
     DeepSeekProvider,
     OpenRouterProvider,
-    # EmergentProvider removed — Emergent dependency dropped.
+    EmergentProvider,
 ]

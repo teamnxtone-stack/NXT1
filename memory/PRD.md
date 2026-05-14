@@ -1,3 +1,23 @@
+## 2026-05-14 — AI generation restored via Emergent universal key
+
+### Root cause
+Previous agent had:
+1. Stripped `emergentintegrations` usage from `ai_service.py` and replaced it with a litellm shim that called the Emergent proxy at the wrong URL (missing `/llm` suffix) and with the wrong model format (`{provider}/{model}` instead of bare model + `custom_llm_provider=openai`).
+2. **Removed `EmergentProvider` entirely from `ALL_ADAPTERS`** in `services/providers/adapters.py`, so `registry.available()` returned `[]` — every builder request returned *"No AI provider is configured"*.
+3. Used model id `claude-haiku-4-5-20251001` which is valid; the previous catalog mistakenly had `claude-haiku-4-5-20250929`.
+
+### Fix applied
+- Added `_build_litellm_kwargs(...)` helper in `services/ai_service.py` that detects `sk-emergent-*` keys and routes to `https://integrations.emergentagent.com/llm` with `custom_llm_provider="openai"` (matches the official `LlmChat._execute_completion` logic from the `emergentintegrations` package).
+- Wired all three first-party adapters (`OpenAIProvider`, `AnthropicProvider`, `EmergentProvider`) and their `generate_stream` variants through the same helper so `EMERGENT_LLM_KEY` works for both blocking and streaming calls.
+- Re-added `EmergentProvider` to `ALL_ADAPTERS`; re-enabled its `generate/generate_stream` by delegating to the new `ai_service.EmergentProvider`.
+- Flipped its `streaming=True` (it actually does stream now via the OpenAI-compatible proxy) and updated the model id to `claude-haiku-4-5-20251001`.
+
+### Verified
+- `curl /api/projects/{id}/chat/stream` → returns `start`/`narration`/`chunk` SSE events (Claude Sonnet 4.5 via emergent). End-to-end build succeeds.
+- `LlmChat` direct call (used by `social_content_service`) → returns OK.
+- Registry `available()` → `['emergent']` when only `EMERGENT_LLM_KEY` is set.
+
+
 # NXT1 — Product Requirements Document
 
 ## Latest user direction (May 14, 2026)

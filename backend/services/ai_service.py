@@ -14,6 +14,58 @@ import litellm
 # helper (`_acomplete`) below. Public API + behaviour are preserved.
 
 
+def _emergent_proxy_url() -> str:
+    """Return the Emergent integration proxy URL (with /llm suffix)."""
+    proxy = (
+        os.environ.get("INTEGRATION_PROXY_URL")
+        or os.environ.get("integration_proxy_url")
+        or "https://integrations.emergentagent.com"
+    )
+    return proxy.rstrip("/") + "/llm"
+
+
+def _build_litellm_kwargs(
+    *,
+    provider: str,
+    model: str,
+    api_key: str,
+    messages: list,
+    max_tokens: int,
+    stream: bool,
+    response_format: Optional[dict] = None,
+) -> dict:
+    """Build litellm kwargs, routing through Emergent proxy when api_key is universal.
+
+    This mirrors what `emergentintegrations.llm.chat.LlmChat` does so the same
+    `sk-emergent-*` key works without needing the proprietary helper.
+    """
+    is_emergent = bool(api_key) and api_key.startswith("sk-emergent-")
+    kwargs: dict = {
+        "messages":   messages,
+        "max_tokens": max_tokens,
+        "stream":     stream,
+        "api_key":    api_key,
+    }
+    if is_emergent:
+        # Emergent proxy is OpenAI-compatible; pass bare model name.
+        # Gemini is the one exception — keep the "gemini/" prefix.
+        kwargs["api_base"] = _emergent_proxy_url()
+        kwargs["custom_llm_provider"] = "openai"
+        if provider == "gemini":
+            kwargs["model"] = f"gemini/{model}"
+        else:
+            kwargs["model"] = model
+        # Identify the calling app so the proxy can attribute usage correctly.
+        app_id = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL")
+        if app_id:
+            kwargs["extra_headers"] = {"X-App-ID": app_id}
+    else:
+        kwargs["model"] = f"{provider}/{model}"
+    if response_format:
+        kwargs["response_format"] = response_format
+    return kwargs
+
+
 async def _acomplete(
     *,
     provider: str,
@@ -25,25 +77,15 @@ async def _acomplete(
     response_format: Optional[dict] = None,
 ) -> str:
     """Non-streaming chat completion via litellm. Returns the text body."""
-    kwargs: dict = {
-        "model":      f"{provider}/{model}",
-        "messages":   [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt},
-        ],
-        "max_tokens": max_tokens,
-        "stream":     False,
-        "api_key":    api_key,
-    }
-    # If we're routing via the Emergent universal key, point litellm at
-    # the Emergent proxy so the same key works as it did under
-    # `emergentintegrations`. Users running on their own keys ignore this
-    # entirely and hit the vendor directly.
-    if api_key and api_key.startswith("sk-emergent-"):
-        proxy = os.environ.get("EMERGENT_BASE_URL", "https://integrations.emergentagent.com")
-        kwargs["api_base"] = proxy
-    if response_format:
-        kwargs["response_format"] = response_format
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": user_prompt},
+    ]
+    kwargs = _build_litellm_kwargs(
+        provider=provider, model=model, api_key=api_key,
+        messages=messages, max_tokens=max_tokens, stream=False,
+        response_format=response_format,
+    )
     resp = await litellm.acompletion(**kwargs)
     return resp["choices"][0]["message"]["content"] or ""
 
@@ -100,10 +142,16 @@ class OpenAIProvider(BaseAIProvider):
         )
 
     async def generate_stream(self, system_prompt: str, user_prompt: str, session_id: str):
-        params = _litellm_params("openai", self.model, self.api_key, system_prompt, user_prompt)
-        params.update({"max_tokens": 32000, "response_format": {"type": "json_object"}, "stream": True})
-        # litellm returns a sync generator with stream=True; iterate
-        response = litellm.completion(**params)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ]
+        kwargs = _build_litellm_kwargs(
+            provider="openai", model=self.model, api_key=self.api_key,
+            messages=messages, max_tokens=32000, stream=True,
+            response_format={"type": "json_object"},
+        )
+        response = litellm.completion(**kwargs)
         for chunk in response:
             try:
                 delta = chunk.choices[0].delta.content or ""
@@ -132,9 +180,15 @@ class AnthropicProvider(BaseAIProvider):
         )
 
     async def generate_stream(self, system_prompt: str, user_prompt: str, session_id: str):
-        params = _litellm_params("anthropic", self.model, self.api_key, system_prompt, user_prompt)
-        params.update({"max_tokens": 12000, "stream": True})
-        response = litellm.completion(**params)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ]
+        kwargs = _build_litellm_kwargs(
+            provider="anthropic", model=self.model, api_key=self.api_key,
+            messages=messages, max_tokens=12000, stream=True,
+        )
+        response = litellm.completion(**kwargs)
         for chunk in response:
             try:
                 delta = chunk.choices[0].delta.content or ""
@@ -153,13 +207,16 @@ class EmergentProvider(BaseAIProvider):
         self.api_key = api_key
         self.model = model
 
+    def _target_provider(self) -> str:
+        if self.model.startswith("gpt") or self.model.startswith("o"):
+            return "openai"
+        if self.model.startswith("gemini"):
+            return "gemini"
+        return "anthropic"
+
     async def generate(self, system_prompt: str, user_prompt: str, session_id: str) -> str:
-        # Route to Anthropic by default; switch to OpenAI when the model
-        # name starts with `gpt`. EMERGENT_LLM_KEY is passed as the
-        # provider-specific key (litellm handles that fine).
-        target = "openai" if self.model.startswith("gpt") else "anthropic"
         return await _acomplete(
-            provider=target,
+            provider=self._target_provider(),
             model=self.model,
             api_key=self.api_key,
             system_prompt=system_prompt,
@@ -167,9 +224,30 @@ class EmergentProvider(BaseAIProvider):
         )
 
     async def generate_stream(self, system_prompt: str, user_prompt: str, session_id: str):
-        # Emergent universal key streaming not exposed; fall back to non-stream
-        text = await self.generate(system_prompt, user_prompt, session_id)
-        yield text
+        # Emergent proxy supports streaming via its OpenAI-compatible endpoint.
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ]
+        kwargs = _build_litellm_kwargs(
+            provider=self._target_provider(), model=self.model, api_key=self.api_key,
+            messages=messages, max_tokens=12000, stream=True,
+        )
+        try:
+            response = litellm.completion(**kwargs)
+            for chunk in response:
+                try:
+                    delta = chunk.choices[0].delta.content or ""
+                except Exception:
+                    delta = ""
+                if delta:
+                    yield delta
+        except Exception as e:
+            # If streaming fails, fall back to non-stream so the build doesn't die
+            logger.warning(f"emergent streaming failed, falling back to non-stream: {e}")
+            text = await self.generate(system_prompt, user_prompt, session_id)
+            if text:
+                yield text
 
 
 class GroqProvider(BaseAIProvider):
