@@ -129,3 +129,12 @@ credentials.json
 frontend/node_modules/.cache/default-development/15.pack
 services/video-studio/node_modules/.pnpm/@cloudflare+workerd-linux-arm64@1.20250718.0/node_modules/@cloudflare/workerd-linux-arm64/bin/workerd
 services/bolt-engine/node_modules/.pnpm/@cloudflare+workerd-linux-arm64@1.20251011.0/node_modules/@cloudflare/workerd-linux-arm64/bin/workerd
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
