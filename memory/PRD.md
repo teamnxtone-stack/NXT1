@@ -1,56 +1,74 @@
 # NXT1 — Product Requirements Document
 
 ## Original problem statement (verbatim)
-> I'm sending you my current app that file don't change anything I want you to install it and then we're gonna make a couple of changes and adjustments.
-> 
-> Follow-up: Implement the changes outlined in `nxt1_social_video_render_prompt.pdf` (Render deploy fix, AI Social Media Content Agent, Video Studio page). Builders/agents must keep running even if the browser is closed.
+> Install my existing app, then add (per nxt1_social_video_render_prompt.pdf): Render deploy fix, AI Social Media Content Agent, Video Studio. Builders/agents must keep running even if browser closed. Workspace login password is 555. Build the full OAuth + posting infrastructure now (I'll paste platform creds later — auto-posting should just work the moment I add them).
 
 ## Architecture
-- **Backend** — FastAPI on uvicorn (port 8001), modular routers under `/app/backend/routes/*`, business logic under `/app/backend/services/*`, MongoDB via motor (`MONGO_URL`, `DB_NAME` from env).
-- **Frontend** — React 19 + CRACO + Tailwind + framer-motion, served at port 3000. All API calls go through `REACT_APP_BACKEND_URL`.
-- **Persistent background jobs** — `services/job_service.py` records every long-running task in the `jobs` Mongo collection (status, progress, phase, logs[], result, error). New work (`run_social_job`, `run_video_job`) is launched as **detached `asyncio.create_task`** from the route handler so the job survives the request lifecycle, browser close, and client disconnect. The UI re-attaches by polling `GET /api/jobs/{id}` (1.5 s) via `useJobProgress` and recalls the last in-flight `job_id` from localStorage. On mount, pages also query their `/jobs` list for any `queued|running` jobs to resume display.
-- **Render deploy** — `render.yaml` at root, `.python-version` at root, `requirements.txt` mirrored at root, `backend/runtime.txt` fixed (`python-3.11.9`).
+- **Backend** — FastAPI + uvicorn (8001) + MongoDB via motor. Modular routers under `/app/backend/routes/*`, services under `/app/backend/services/*`.
+- **Frontend** — React 19 + CRACO + Tailwind + framer-motion (port 3000). API calls via `REACT_APP_BACKEND_URL`.
+- **Persistent execution** — `services/job_service.py` records every long task in Mongo `jobs`. New work is launched as detached `asyncio.create_task` so the job survives request lifecycle, browser close, client disconnect. UI re-attaches via `useJobProgress` (poll + localStorage recall).
+- **Background scheduler** — `services/social_scheduler.py` runs forever on the FastAPI event loop (started in `on_startup`). Every 60 s it (a) publishes posts whose `scheduled_at <= now` if a connection exists, (b) fires weekly auto-pilot for users whose enabled + day-of-week + hour match.
+- **OAuth** — `services/social_publishing_service.py` builds platform-specific authorize URLs, exchanges codes for tokens (Meta Graph v21, LinkedIn OIDC, X OAuth 2.0 + PKCE), and publishes (IG Graph media+media_publish, LinkedIn UGC, X v2 tweets). All gated by env-var presence; no platform code runs until creds are pasted.
+- **Render deploy** — `render.yaml` at root, `.python-version` at root, mirrored `requirements.txt` at root.
 
 ## What's been implemented (2026-05-14)
-- **Existing codebase installed** — preserved `.env`s, ran `pip install -r requirements.txt`, `yarn install`, added missing `eslint-config-react-app@7.0.1` (was blocking webpack), services running clean via supervisor.
-- **Render deploy fix**
-  - `/app/render.yaml` — web service, rootDir=backend, build/start cmds, envVars stub.
-  - `/app/.python-version` — `3.11.9`.
-  - `/app/requirements.txt` — mirrored from backend/.
-  - `backend/runtime.txt` — fixed typo (`pyhon` → `python-3.11.9`).
-- **Social Content Agent (backend)**
-  - `routes/social.py` (15 endpoints): generate (detached job), posts list/get/patch/delete/regenerate, profile get/save, logo upload+serve, jobs list, assets serve.
-  - `services/social_content_service.py` — Claude `claude-sonnet-4-5-20250929` for structured plan JSON, OpenAI `gpt-image-1` for images, Pillow logo overlay (15% width, bottom-right), MongoDB `social_posts` collection.
-- **Video Studio (backend)**
-  - `routes/video.py` (12 endpoints): generate (Fal.ai detached job), upload mp4/mov/webm, clips list/delete/serve, jobs, timeline save/list/get, post-to-social.
-  - `services/video_studio_service.py` — `fal-ai/cogvideox-5b` via `fal_client`. Downloads result mp4, stores under `backend/static/video/clips/`.
-- **Social Page** (`pages/workspace/SocialPage.jsx`)
-  - 40/60 desktop split → stacked mobile. Chat-style brief input, platform/duration/tone chips, profile drawer (niche, about, logo upload), live progress with logs, native post-calendar grid with Regenerate / Approve / Delete actions. Re-attaches to any in-flight job on mount.
-- **Studio Page** (`pages/workspace/StudioPage.jsx`)
-  - Header (Upload / AI Generate / Export MP4) + main video player + timeline strip + clip library sidebar. AI Generate drawer (prompt + style + duration). Post-to-Social modal creates a social_posts draft. Re-attaches to in-flight AI video jobs.
-- **Sidebar nav** — added Social (Megaphone) + Studio (Film) items in `WorkspaceShell.jsx`.
-- **Routes** — `/workspace/social` + `/workspace/studio` registered in `App.js`.
-- **API helpers** — full social + video clients in `lib/api.js`; `useJobProgress` hook with persistent localStorage re-attach.
-- **Testing** — 32/32 backend tests PASSED (iteration_6.json). Includes persistent-jobs survives-backend-restart verification.
 
-## Verified end-to-end flows
-- Social: generate "founder LinkedIn post" → Claude plan (10 s) → DALL-E image (15 s) → post visible in calendar with image, caption, hashtags; Regenerate produces fresh image+caption; Approve flips status.
-- Studio: upload .mp4 → appears in Library → Add to Timeline → plays in player → Post to Social creates a social_post draft.
-- Persistence: closing the tab during generation does NOT stop the job; reopening the page resumes progress display via localStorage recall + `/jobs` fallback.
+### Foundation
+- Installed existing NXT1 zip, preserved `.env`s, fixed missing `eslint-config-react-app@7.0.1`. Backend + frontend run clean via supervisor.
 
-## Next Action Items (P0 → P2)
-- **P0 — User to push to GitHub** via the in-app "Save to Github" button. Render auto-deploy will then pick up `render.yaml`.
-- **P0 — Add FAL_API_KEY** to `/app/backend/.env` to enable AI text-to-video (currently UI shows a clear "FAL_API_KEY not configured" notice in the AI Generate drawer).
-- **P1 — Postiz native replacement** (per user choice: A. native build, no docker sidecars). Currently we schedule into MongoDB; auto-posting to Instagram/X/LinkedIn requires each platform's OAuth + Graph API tokens. Add `INSTAGRAM_ACCESS_TOKEN`, `LINKEDIN_ACCESS_TOKEN`, `TWITTER_*` envs + posting workers when user is ready.
-- **P1 — Multi-clip MP4 stitching in Studio export** (currently exports the active clip directly). Browser-side: integrate `ffmpeg.wasm`; server-side: add a `routes/video.py` `/export` endpoint that uses system ffmpeg.
-- **P1 — Mobile polish** at 390 px width — already responsive via tailwind `lg:` breakpoints but needs a swipe test on real device.
-- **P2 — WebSocket push** instead of 1.5 s polling for progress (lower latency, lower load). Backend `chat_router` already has WS pattern to copy.
-- **P2 — Logo position / size / opacity controls** for social image overlay.
+### Render deploy fix
+- `/app/render.yaml`, `/app/.python-version`, `/app/requirements.txt` (root mirror), `backend/runtime.txt` typo fix.
+
+### Workspace auth
+- `APP_PASSWORD=555` (admin/legacy gate at `/access`).
+- `JWT_SECRET` pinned (no more dev default).
+
+### Social Content Agent
+- **Backend**: `routes/social.py`, `services/social_content_service.py` — Claude `claude-sonnet-4-5-20250929` plan JSON + OpenAI `gpt-image-1` images + Pillow logo overlay. Mongo `social_posts`, `social_profiles`.
+- **Frontend**: `pages/workspace/SocialPage.jsx` — chat brief + tone/platforms/duration chips + profile drawer + native post calendar with **Regenerate / Approve / Schedule / Post Now / Delete** actions per card. Persistent job progress with localStorage re-attach.
+
+### Social OAuth + posting infrastructure (NEW)
+- **Backend**: `routes/social_oauth.py`, `services/social_publishing_service.py`
+  - `GET /api/social/oauth/status` — what's configured server-side
+  - `GET /api/social/oauth/{platform}/start` — auth URL (with PKCE for X)
+  - `GET /api/social/oauth/{platform}/callback` — browser-redirect; exchanges code → stores token in `social_connections`
+  - `GET /api/social/connections`, `POST /api/social/connections/{platform}/disconnect`
+  - `POST /api/social/posts/{id}/publish` (now) and `/schedule`
+- **Frontend**: `components/social/ConnectionsAndAutopilot.jsx` — Connect/Disconnect rows + "Server creds not configured" hint when env vars missing.
+
+### Weekly Auto-pilot (NEW)
+- **Backend**: `services/social_scheduler.py` — async loop, ticks every 60 s. Reads `social_autopilot` docs (enabled + cadence_day + cadence_hour + brief). On match (and last_run > 6 days ago), kicks off the same detached generation job used by `/api/social/generate`.
+- `GET / POST /api/social/autopilot` to read / write the config.
+- **Frontend**: Autopilot toggle + brief + day + hour in the Social page brand drawer.
+
+### Video Studio
+- **Backend**: `routes/video.py`, `services/video_studio_service.py` — Fal.ai `cogvideox-5b` text-to-video (detached job), mp4/mov/webm upload, clip CRUD, timeline save, post-to-social handoff.
+- **Frontend**: `pages/workspace/StudioPage.jsx` — header (Upload / AI Generate / Export MP4), video player, timeline strip, library, AI Generate drawer, Post-to-Social modal.
+
+### Sidebar
+- `WorkspaceShell.jsx`: Home / Apps / **Social** / **Studio** / Agents / AgentOS / Account.
+
+### Mobile polish
+- Verified responsive at 390 px. Social: stacked single column; chips wrap; PostCard's 5-button action row uses 44 px touch targets via `IconBtn`. Studio: header buttons wrap; player + timeline + library stack.
+
+## Testing
+- **Iter 6** — 32/32 PASS (Social + Video core, detached jobs, regenerate, FAL gating, persistence across restart).
+- **Iter 7** — 30/30 PASS (password 555, OAuth status/start/callback gating, connections, autopilot CRUD, scheduler safety with no connection).
+
+## Next Action Items
+- **P0 — Push to GitHub** via the "Save to GitHub" button. Render auto-deploys via `render.yaml`. Set these env vars on Render: `MONGO_URL`, `DB_NAME`, `EMERGENT_LLM_KEY`, `APP_PASSWORD`, `JWT_SECRET`, `PUBLIC_BACKEND_URL` (your Render URL), and the platform creds below.
+- **P0 — Paste platform credentials** into `/app/backend/.env` (and Render env) — full list in `/app/memory/test_credentials.md`. The moment any pair is set + backend restarts, the corresponding Connect button activates.
+- **P1 — Multi-clip MP4 stitching** in Studio export (currently downloads active clip). Needs ffmpeg.wasm or a server-side ffmpeg endpoint.
+- **P1 — LinkedIn image posting** — current UGC post is text-only; for image uploads we need the `assets?action=registerUpload` flow (deferred).
+- **P1 — Instagram Reels / X video** posting via /media + /media_publish — currently only image posting wired for IG; X is text-only.
+- **P2 — WebSocket push** instead of 1.5 s polling for progress.
+- **P2 — Logo overlay controls** (size / position / opacity).
+- **P2 — Refresh-token rotation** for X (refresh tokens issued but not yet auto-rotated).
 
 ## Personas
-- **Founder operator** — wants weekly content + product demo videos without a marketing team.
-- **Solo developer / indie hacker** — uses Studio for demo clips, Social for build-in-public posts.
+- **Founder operator** — weekly content + product demos without a marketing team.
+- **Solo developer / indie hacker** — Studio for demos, Social for build-in-public.
 
 ## Environment
-- Backend `.env`: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`, `EMERGENT_LLM_KEY` (set), `FAL_API_KEY` (empty — user-supplied).
+- Backend `.env`: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`, `EMERGENT_LLM_KEY` (set), `APP_PASSWORD=555`, `JWT_SECRET`, `PUBLIC_BACKEND_URL`, plus empty placeholders for: `FAL_API_KEY`, `META_APP_ID`, `META_APP_SECRET`, `X_CLIENT_ID`, `X_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`.
 - Frontend `.env`: `REACT_APP_BACKEND_URL`, `WDS_SOCKET_PORT=443`, `ENABLE_HEALTH_CHECK=false`.
