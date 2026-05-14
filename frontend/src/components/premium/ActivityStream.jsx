@@ -117,16 +117,16 @@ export function ActivityStream({ steps = [] }) {
                 }}
                 exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
                 transition={SPRING}
-                className="flex items-center gap-3 px-3.5 py-2 rounded-xl"
+                className="flex items-center gap-3 px-3.5 py-2 rounded-xl nxt-activity-row"
                 style={{
                   background: isActive
-                    ? "linear-gradient(180deg, rgba(48,48,56,0.55) 0%, rgba(36,36,40,0.55) 100%)"
+                    ? "var(--nxt-surface)"
                     : "transparent",
                   border: isActive
                     ? `1px solid ${activeColor}30`
                     : "1px solid transparent",
                   boxShadow: isActive
-                    ? `0 12px 32px -16px ${activeColor}30, inset 0 1px 0 rgba(255,255,255,0.03)`
+                    ? `0 12px 32px -16px ${activeColor}30, inset 0 1px 0 var(--nxt-border-soft)`
                     : "none",
                   backdropFilter: isActive ? "blur(14px) saturate(140%)" : undefined,
                   WebkitBackdropFilter: isActive ? "blur(14px) saturate(140%)" : undefined,
@@ -140,7 +140,7 @@ export function ActivityStream({ steps = [] }) {
                     <span
                       className="text-[13.5px] leading-tight truncate"
                       style={{
-                        color: isActive ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.72)",
+                        color: isActive ? "var(--nxt-fg)" : "var(--nxt-fg-dim)",
                         fontWeight: isActive ? 500 : 400,
                         letterSpacing: "-0.005em",
                       }}
@@ -152,7 +152,7 @@ export function ActivityStream({ steps = [] }) {
                   {s.detail ? (
                     <div
                       className="text-[11.5px] mono mt-0.5 truncate"
-                      style={{ color: "rgba(255,255,255,0.4)", letterSpacing: "0.01em" }}
+                      style={{ color: "var(--nxt-fg-faint)", letterSpacing: "0.01em" }}
                     >
                       {s.detail}
                     </div>

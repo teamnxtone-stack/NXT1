@@ -263,15 +263,22 @@ async def node_debugger(state: WorkflowState) -> WorkflowState:
 
 
 async def node_deployer(state: WorkflowState) -> WorkflowState:
+    """Auto-complete the deploy hand-off — runs in the background, no UI popup.
+
+    Previously this set status='waiting' + requires_approval=True so users
+    had to click "Approve & deploy". We removed that interruption per UX
+    feedback: builds finish silently and users hit Deploy explicitly when
+    they're ready.
+    """
     target = state.get("deploy_target") or "internal"
     await _record_phase(state, "deployer", "devops",
-                        f"Deploy hand-off prepared (target: {target}). Awaiting user approval.",
-                        status="waiting")
-    state["status"] = "waiting"
-    state["requires_approval"] = True
+                        f"Deploy hand-off prepared (target: {target}).",
+                        status="completed")
+    state["status"] = "completed"
+    state["requires_approval"] = False
     await COL.update_one(
         {"workflow_id": state["workflow_id"]},
-        {"$set": {"status": "waiting", "requires_approval": True}},
+        {"$set": {"status": "completed", "requires_approval": False}},
     )
     return state
 

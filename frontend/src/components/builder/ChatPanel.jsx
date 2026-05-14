@@ -25,7 +25,7 @@ import { createStreamReducer } from "@/components/premium/streamReducer";
 import ComposerActions from "@/components/premium/ComposerActions";
 import ProtocolModeChip from "@/components/builder/ProtocolModeChip";
 import BuildTimeline from "@/components/builder/BuildTimeline";
-import ResumeWorkflowChip from "@/components/builder/ResumeWorkflowChip";
+import ResumeWorkflowChip from "@/components/builder/ResumeWorkflowChip"; // eslint-disable-line no-unused-vars
 import { fileActivity } from "@/lib/fileActivity";
 import {
   liveSyncAppend,
@@ -712,7 +712,7 @@ export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdate
       </div>
 
       <form onSubmit={submit} className="shrink-0 px-3 sm:px-4 pt-3 pb-3 sm:pb-4 surface-0 nxt-safe-bottom nxt-mobile-composer">
-        <ResumeWorkflowChip projectId={projectId} />
+        {/* ResumeWorkflowChip removed — deployer now auto-completes in the backend (no manual approval popup) */}
         <div
           className="flex items-end gap-1.5 rounded-3xl border border-white/10 surface-1 px-2 py-2 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.55)] focus-within:border-white/22 focus-within:shadow-[0_12px_48px_-12px_rgba(94,234,212,0.16)] transition-all"
         >
@@ -1016,7 +1016,8 @@ function NarrationStream({ lines }) {
       {lines.map((n, i) => (
         <div
           key={n.id}
-          className="flex items-start gap-2 text-[14px] leading-relaxed text-zinc-200"
+          className="flex items-start gap-2 text-[14px] leading-relaxed"
+          style={{ color: "var(--nxt-fg-dim)" }}
         >
           <span className="text-emerald-400 shrink-0 mt-0.5">›</span>
           <span className={isLast(i) ? "nxt-cursor" : ""}>{n.line}</span>

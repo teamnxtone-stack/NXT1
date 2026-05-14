@@ -1,3 +1,32 @@
+## 2026-05-14 — Clean break from Emergent + UX fixes
+
+### Removed Emergent coupling (per user request — self-hosting with own keys)
+- Removed `emergentintegrations==0.1.0` from `requirements.txt` (both root + backend).
+- Removed `--extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/` from `render.yaml` build command.
+- Removed `EMERGENT_LLM_KEY` entry from `render.yaml` env vars list.
+- Refactored `services/social_content_service.py`:
+  - Dropped `LlmChat`, `UserMessage`, `ImageContent`, `OpenAIImageGeneration` imports
+  - Added local `_claude_chat()` using `litellm` directly with vision support
+  - Added local `_openai_image()` using the standard `openai.AsyncOpenAI` SDK
+  - Both helpers prefer the user's own `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and only fall back to the Emergent proxy if neither is set (dead code path on user's server).
+- Removed "Emergent universal key" string from job log messages.
+
+### Fixed: Build pipeline "Approve & deploy" popup
+- `services/workflow_service.py::node_deployer` now auto-completes (status=`completed`, requires_approval=False) instead of pausing at `waiting`. Builds finish in the background — no intrusive popup.
+- Removed `<ResumeWorkflowChip>` mount from `components/builder/ChatPanel.jsx`.
+
+### Fixed: Light mode unreadable text
+- `components/premium/ActivityStream.jsx`: swapped hardcoded `rgba(255,255,255,*)` text colors for `var(--nxt-fg)` / `var(--nxt-fg-dim)` / `var(--nxt-fg-faint)` so they theme correctly.
+- `components/builder/ChatPanel.jsx::NarrationStream`: replaced Tailwind `text-zinc-200` with `var(--nxt-fg-dim)`.
+- Added light-mode safety-net rules in `index.css` that override any remaining hardcoded white text classes (`text-white`, `text-zinc-200/300/400`, `text-white/40-80`) so future regressions can't hide content on cream backgrounds.
+
+### Verified
+- `curl /api/workflows/start` → returns `status: completed` immediately, no waiting state.
+- Social post generation end-to-end: 17 posts in calendar, all with images, captions, hashtags.
+- Builder chat streaming works via `EMERGENT_LLM_KEY` in preview AND would work via real `ANTHROPIC_API_KEY` on user's server.
+- Light mode builder screenshot: dark legible text on cream background, no popups.
+
+
 ## 2026-05-14 — AI generation restored via Emergent universal key
 
 ### Root cause

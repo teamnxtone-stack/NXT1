@@ -1474,3 +1474,43 @@ html[data-theme="light"] [data-testid="builder-desktop-preview"] {
         touch-action: manipulation;
     }
 }
+
+
+/* ─── Light-mode safety net: builder chat / activity stream readability ───
+   The activity stream + narration historically used hardcoded
+   `rgba(255,255,255,*)` colors and `text-zinc-*` Tailwind classes that
+   become invisible against the cream light-mode background. These rules
+   force theme-aware contrast on the affected areas. */
+html[data-theme="light"] [data-testid="agent-narration"],
+html[data-theme="light"] [data-testid="agent-narration"] span:not([class*="emerald"]),
+html[data-theme="light"] [data-testid^="activity-step-"] {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid^="activity-step-"] .mono {
+    color: var(--nxt-fg-faint) !important;
+}
+html[data-theme="light"] .nxt-activity-row[data-state="running"] {
+    background: linear-gradient(180deg, rgba(20, 130, 110, 0.10) 0%, rgba(20, 130, 110, 0.04) 100%) !important;
+    border-color: rgba(20, 130, 110, 0.30) !important;
+}
+/* Common text-zinc-* Tailwind text colors that vanish on cream */
+html[data-theme="light"] .text-zinc-200,
+html[data-theme="light"] .text-zinc-300,
+html[data-theme="light"] .text-zinc-400 {
+    color: var(--nxt-text-3) !important;
+}
+html[data-theme="light"] .text-zinc-500 {
+    color: var(--nxt-text-4) !important;
+}
+html[data-theme="light"] .text-white {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] .text-white\/60,
+html[data-theme="light"] .text-white\/70,
+html[data-theme="light"] .text-white\/80 {
+    color: var(--nxt-fg-dim) !important;
+}
+html[data-theme="light"] .text-white\/40,
+html[data-theme="light"] .text-white\/50 {
+    color: var(--nxt-fg-faint) !important;
+}
