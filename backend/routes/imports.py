@@ -20,6 +20,12 @@ class GitImportIn(BaseModel):
     project_name: Optional[str] = ""
 
 
+class URLImportIn(BaseModel):
+    url: str
+    mode: Optional[str] = "revamp"  # "revamp" | "clone-structure"
+    project_name: Optional[str] = ""
+
+
 def _make_imported_project_doc(name: str, files: list, analysis: dict) -> dict:
     from services import preview_service as _ps
     now = datetime.now(timezone.utc).isoformat()
@@ -108,6 +114,59 @@ async def import_github(body: GitImportIn, _: str = Depends(verify_token)):
     return {"id": doc["id"], "name": doc["name"],
             "files_count": len(files), "analysis": analysis,
             "github": doc.get("github")}
+
+
+@router.post("/projects/import/url")
+async def import_url(body: URLImportIn, _: str = Depends(verify_token)):
+    """Phase E — paste a URL → revamp blueprint → seed a new project.
+
+    The page is fetched, parsed into a structured blueprint (brand, hero,
+    nav, sections, palette, fonts), then handed off as the project's
+    `revamp_blueprint`. The builder reads this on first /chat to regenerate
+    the same site using premium NXT1 components instead of literal HTML.
+    """
+    from services import url_import_service
+    try:
+        blueprint = await url_import_service.analyze_url(body.url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"URL fetch failed: {e}")
+    if not blueprint.get("sections") and not blueprint.get("hero", {}).get("title"):
+        raise HTTPException(status_code=400, detail="Could not extract meaningful content from URL")
+    # Seed a minimal project with a single index.html stub + the blueprint
+    # in analysis so the builder's first run can revamp it.
+    name = (body.project_name.strip() if body.project_name
+            else blueprint["brand"]["name"] or blueprint["host"]) or "Revamped site"
+    initial_html = (
+        "<!doctype html><html><head><meta charset=\"utf-8\"/>"
+        f"<title>{blueprint['brand'].get('name', name)}</title>"
+        "</head><body><main style=\"padding:2rem;font-family:Inter,system-ui,sans-serif\">"
+        "<h1>NXT1 revamp scaffold</h1>"
+        "<p>This project was seeded from a URL import. Ask the builder to "
+        "“revamp this site using premium NXT1 components.”</p>"
+        "</main></body></html>"
+    )
+    files = [{
+        "path": "index.html",
+        "content": initial_html,
+        "language": "html",
+        "size": len(initial_html),
+    }]
+    analysis = {
+        "summary": f"URL import — {blueprint['host']}",
+        "import_source": "url",
+        "revamp_mode": body.mode or "revamp",
+        "revamp_blueprint": blueprint,
+        "env_keys": [],
+    }
+    doc = _make_imported_project_doc(name, files, analysis)
+    doc["import_source"] = "url"
+    doc["source_url"] = blueprint["source_url"]
+    await db.projects.insert_one(dict(doc))
+    return {
+        "id": doc["id"], "name": doc["name"], "blueprint": blueprint,
+        "files_count": len(files),
+    }
+
 
 
 def _parse_github_url(url: str):

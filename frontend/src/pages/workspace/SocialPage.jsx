@@ -225,13 +225,13 @@ export default function SocialPage() {
 
   return (
     <div
-      className="flex flex-col lg:flex-row h-full min-h-0 w-full"
+      className="flex flex-col lg:flex-row lg:h-full min-h-0 w-full"
       data-testid="social-page"
       style={{ background: "var(--nxt-bg)", color: "var(--nxt-fg)" }}
     >
       {/* LEFT — Chat + Profile + Progress */}
       <aside
-        className="w-full lg:w-[40%] lg:max-w-[520px] shrink-0 flex flex-col min-h-0 border-r"
+        className="w-full lg:w-[40%] lg:max-w-[520px] shrink-0 flex flex-col lg:min-h-0 lg:border-r"
         style={{ borderColor: "var(--nxt-border)" }}
       >
         <div className="px-5 pt-6 pb-3">
@@ -564,7 +564,7 @@ export default function SocialPage() {
       </aside>
 
       {/* RIGHT — Post calendar */}
-      <section className="flex-1 min-h-0 flex flex-col">
+      <section className="flex-1 lg:min-h-0 flex flex-col">
         <div
           className="shrink-0 px-5 sm:px-7 py-4 flex items-center justify-between gap-3 flex-wrap"
           style={{ borderBottom: "1px solid var(--nxt-border)" }}
@@ -599,7 +599,7 @@ export default function SocialPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-7">
+        <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-5 sm:p-7 pb-24 lg:pb-7">
           {posts.length === 0 && !loadingPosts && (
             <div className="text-center py-20" style={{ color: "var(--nxt-text-3)" }}>
               <ImageIcon size={28} className="mx-auto mb-3 opacity-40" />

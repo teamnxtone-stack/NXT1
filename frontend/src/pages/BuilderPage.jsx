@@ -273,6 +273,8 @@ export default function BuilderPage() {
                   toast.error(fe.title, { description: fe.hint });
                 }
               }}
+              onConnectDomain={() => setDeployOpen(true)}
+              deployedUrl={autoDeployment?.status === "deployed" ? (autoDeployment.public_url || autoDeployment.url) : null}
             />
           </div>
 

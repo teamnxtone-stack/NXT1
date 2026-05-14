@@ -361,7 +361,11 @@ async def start_workflow(project_id: str, prompt: str, user_id: str = "admin",
     await COL.insert_one(dict(state))
 
     # Execute the graph in background — survives the HTTP call.
-    asyncio.create_task(_run_to_completion(state))
+    task = asyncio.create_task(_run_to_completion(state))
+    try:
+        _register_task(workflow_id, task)
+    except NameError:  # _register_task defined later in this module
+        pass
     return {"workflow_id": workflow_id, "status": "queued"}
 
 
@@ -389,6 +393,23 @@ async def _run_to_completion(state: WorkflowState) -> None:
                 {"$set": {"status": "completed",
                           "updated_at": datetime.now(timezone.utc).isoformat()}},
             )
+        # Drop a durable notification so the user's bell-icon panel
+        # picks it up — replaces the legacy random bottom toasts.
+        try:
+            from routes import notifications as _notifs
+            uid = state.get("user_id") or final.get("user_id") if final else None
+            pid = state.get("project_id")
+            if uid:
+                await _notifs.emit(
+                    uid,
+                    kind="build_complete",
+                    title="Build ready",
+                    body=f"Workflow {state['workflow_id'][:8]} finished. Preview is live — deploy when you're ready.",
+                    link=f"/builder/{pid}" if pid else None,
+                    meta={"workflow_id": state["workflow_id"], "project_id": pid},
+                )
+        except Exception as e:
+            logger.debug(f"workflow notification skipped: {e}")
     except Exception as e:  # noqa: BLE001
         logger.exception("workflow run failed")
         await COL.update_one(
@@ -396,6 +417,22 @@ async def _run_to_completion(state: WorkflowState) -> None:
             {"$set": {"status": "failed", "error": str(e)[:400],
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
+        try:
+            from routes import notifications as _notifs
+            final = await COL.find_one({"workflow_id": state["workflow_id"]}, {"_id": 0})
+            uid = state.get("user_id") or (final.get("user_id") if final else None)
+            pid = state.get("project_id")
+            if uid:
+                await _notifs.emit(
+                    uid,
+                    kind="build_failed",
+                    title="Build failed",
+                    body=str(e)[:280],
+                    link=f"/builder/{pid}" if pid else None,
+                    meta={"workflow_id": state["workflow_id"], "project_id": pid},
+                )
+        except Exception:
+            pass
 
 
 async def get_workflow(workflow_id: str) -> Optional[Dict]:
@@ -530,3 +567,93 @@ async def reconcile_coder_phase(project_id: str, files_count: int = 0,
     except Exception as e:  # noqa: BLE001
         logger.warning(f"reconcile_coder_phase failed: {e}")
         return None
+
+
+
+# ─── Phase C — Durable workflow recovery ──────────────────────────────────
+# Orphan = MongoDB doc with status=running but no in-process asyncio task.
+# Happens when the previous process died (deploy, crash, restart). We re-spawn
+# them so users who closed the tab still see their build finish.
+_RUNNING_TASKS: Dict[str, asyncio.Task] = {}
+
+
+def _register_task(workflow_id: str, task: asyncio.Task) -> None:
+    _RUNNING_TASKS[workflow_id] = task
+    task.add_done_callback(lambda _t: _RUNNING_TASKS.pop(workflow_id, None))
+
+
+async def resume_orphaned_workflows() -> Dict:
+    """Find workflows stuck in `running` or `queued` with no live task and
+    re-spawn them. Marks workflows untouched for >24h as failed so the
+    sweep doesn't churn forever."""
+    from datetime import timedelta as _td
+    cutoff_dead  = (datetime.now(timezone.utc) - _td(hours=24)).isoformat()
+    resumed = 0
+    dropped = 0
+    cur = COL.find(
+        {"status": {"$in": ["queued", "running"]}},
+        {"_id": 0, "workflow_id": 1, "updated_at": 1, "state": 1, "user_id": 1},
+    )
+    async for doc in cur:
+        wid = doc["workflow_id"]
+        if wid in _RUNNING_TASKS and not _RUNNING_TASKS[wid].done():
+            continue  # live in this process
+        # Older than 24h with no progress — give up.
+        if (doc.get("updated_at") or "") < cutoff_dead:
+            await COL.update_one(
+                {"workflow_id": wid},
+                {"$set": {"status": "failed", "error": "Stalled — auto-failed by recovery sweep",
+                          "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            dropped += 1
+            continue
+        # Otherwise: re-spawn. The workflow's persisted state already lives
+        # in MongoDB; we just need to kick a new asyncio task to drive it.
+        state = doc.get("state") or {}
+        state.setdefault("workflow_id", wid)
+        state.setdefault("user_id", doc.get("user_id"))
+        try:
+            task = asyncio.create_task(_drive_existing_workflow(wid, state))
+            _register_task(wid, task)
+            resumed += 1
+            logger.info(f"workflow recovery: resumed {wid}")
+        except Exception as e:
+            logger.warning(f"workflow recovery: couldn't resume {wid}: {e}")
+    if resumed or dropped:
+        logger.info(f"workflow recovery sweep: resumed={resumed} dropped={dropped}")
+    return {"resumed": resumed, "dropped": dropped}
+
+
+async def _drive_existing_workflow(workflow_id: str, state: Dict) -> None:
+    """Resume by replaying through the LangGraph (or linear) runner.
+
+    Since our nodes are idempotent (they write status to Mongo and only
+    advance if the prior step is `done`), replaying from the start is safe
+    and reaches the next non-done node naturally.
+    """
+    try:
+        graph = _build_graph()
+        if graph is None:
+            for fn in [node_planner, node_architect, node_coder, node_tester,
+                       node_debugger, node_deployer]:
+                state = await fn(state)
+                if state.get("status") in ("failed", "waiting", "completed"):
+                    break
+        else:
+            async for _ in graph.astream(state):
+                pass
+        # Final reconciliation — mark completed if still in flight.
+        final = await COL.find_one({"workflow_id": workflow_id}, {"_id": 0})
+        if final and final.get("status") in (None, "running", "queued"):
+            await COL.update_one(
+                {"workflow_id": workflow_id},
+                {"$set": {"status": "completed",
+                          "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"resume drive failed for {workflow_id}: {e}")
+        await COL.update_one(
+            {"workflow_id": workflow_id},
+            {"$set": {"status": "failed", "error": f"resume failed: {str(e)[:240]}",
+                      "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )

@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import NotificationCenter from "@/components/NotificationCenter";
 import {
   Menu,
   X,
@@ -80,7 +81,7 @@ function MinimalTopBar({ onMenu }) {
         <Menu size={16} />
       </button>
       <Brand size="sm" gradient />
-      <span className="w-10" aria-hidden />
+      <NotificationCenter />
     </header>
   );
 }

@@ -8,6 +8,7 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import Brand from "@/components/Brand";
+import NotificationCenter from "@/components/NotificationCenter";
 
 export default function AppHeader({ project, onOpenTools }) {
   const navigate = useNavigate();
@@ -46,20 +47,23 @@ export default function AppHeader({ project, onOpenTools }) {
         </div>
       </div>
 
-      <button
-        onClick={onOpenTools}
-        className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-[12.5px] transition"
-        style={{
-          background: "transparent",
-          border: "1px solid var(--nxt-border-soft)",
-          color: "var(--nxt-fg-dim)",
-        }}
-        data-testid="open-tools-button"
-        title="Advanced tools"
-      >
-        <SlidersHorizontal size={13} />
-        <span className="hidden md:inline">Tools</span>
-      </button>
+      <div className="flex items-center gap-2">
+        <NotificationCenter />
+        <button
+          onClick={onOpenTools}
+          className="inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-[12.5px] transition"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--nxt-border-soft)",
+            color: "var(--nxt-fg-dim)",
+          }}
+          data-testid="open-tools-button"
+          title="Advanced tools"
+        >
+          <SlidersHorizontal size={13} />
+          <span className="hidden md:inline">Tools</span>
+        </button>
+      </div>
     </header>
   );
 }

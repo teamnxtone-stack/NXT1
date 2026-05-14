@@ -108,8 +108,9 @@ export default function WorkspaceHome() {
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [importTab, setImportTab] = useState("zip"); // zip | github
+  const [importTab, setImportTab] = useState("zip"); // zip | github | url
   const [repoUrl, setRepoUrl] = useState("");
+  const [urlImportValue, setUrlImportValue] = useState("");
   // Templates gallery state
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState([]);
@@ -222,6 +223,25 @@ export default function WorkspaceHome() {
       navigate(`/builder/${data.id}`);
     } catch (e) {
       const fe = friendlyError(e?.response?.data?.detail || e?.message || "GitHub import failed");
+      toast.error(fe.title, { description: fe.hint });
+    } finally {
+      setImporting(false);
+      setShowImport(false);
+    }
+  };
+
+  const handleUrlImport = async () => {
+    const url = (urlImportValue || "").trim();
+    if (!url) return;
+    setImporting(true);
+    try {
+      const { data } = await api.post("/projects/import/url", { url, mode: "revamp" });
+      toast.success(`Imported ${data.blueprint?.host || "site"}`, {
+        description: `Opening ${data.name}…`,
+      });
+      navigate(`/builder/${data.id}`);
+    } catch (e) {
+      const fe = friendlyError(e?.response?.data?.detail || e?.message || "URL import failed");
       toast.error(fe.title, { description: fe.hint });
     } finally {
       setImporting(false);
@@ -423,7 +443,7 @@ export default function WorkspaceHome() {
                   border: "1px solid var(--nxt-border-soft)",
                 }}
               >
-                {["zip", "github"].map((t) => (
+                {["zip", "github", "url"].map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -436,7 +456,7 @@ export default function WorkspaceHome() {
                     }}
                     data-testid={`workspace-import-tab-${t}`}
                   >
-                    {t === "zip" ? "Upload ZIP" : "GitHub URL"}
+                    {t === "zip" ? "Upload ZIP" : t === "github" ? "GitHub URL" : "From URL"}
                   </button>
                 ))}
               </div>
@@ -511,6 +531,48 @@ export default function WorkspaceHome() {
                     }
                     {importing ? "Cloning…" : "Import from GitHub"}
                   </button>
+                </div>
+              )}
+
+              {importTab === "url" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-3 h-12 rounded-2xl"
+                    style={{
+                      background: "var(--nxt-surface-soft)",
+                      border: "1px solid var(--nxt-border)",
+                    }}
+                  >
+                    <Globe size={14} style={{ color: "var(--nxt-fg-faint)" }} />
+                    <input
+                      type="url"
+                      value={urlImportValue}
+                      onChange={(e) => setUrlImportValue(e.target.value)}
+                      placeholder="https://example.com — paste a site to revamp"
+                      className="flex-1 bg-transparent outline-none text-[14px]"
+                      style={{ color: "var(--nxt-fg)" }}
+                      data-testid="workspace-import-url-input"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUrlImport}
+                    disabled={importing || !(urlImportValue || "").trim()}
+                    className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-2xl text-[14px] font-medium transition disabled:opacity-60"
+                    style={{
+                      background: "var(--nxt-accent)",
+                      color: "var(--nxt-bg)",
+                    }}
+                    data-testid="workspace-import-url-button"
+                  >
+                    {importing
+                      ? <Loader2 size={14} className="animate-spin" />
+                      : <Globe size={14} strokeWidth={2.4} />
+                    }
+                    {importing ? "Importing…" : "Revamp this site"}
+                  </button>
+                  <p className="text-[11.5px] text-center" style={{ color: "var(--nxt-fg-faint)" }}>
+                    Crawls the page, pulls brand + structure, and seeds a new project the builder can rebuild premium.
+                  </p>
                 </div>
               )}
 

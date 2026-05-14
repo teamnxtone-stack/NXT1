@@ -1,3 +1,41 @@
+## 2026-05-14 — Phases A–E shipped (stabilization brief)
+
+### Phase A — Stop the bleeding
+- Removed legacy `google-generativeai` from both `requirements.txt` files (kept only `google-genai`).
+- Disabled the legacy `useAgentActivityWatcher` that was firing random bottom toasts on every page (now a no-op shim; superseded by the bell-icon Notification Center).
+- Mobile fix on `SocialPage.jsx`: parent `h-full min-h-0` → `lg:h-full lg:min-h-0` so mobile lets the page scroll naturally instead of locking columns. Right calendar pane gains `pb-24 lg:pb-7` so the last post isn't covered by the safe-area composer.
+- Builder chat: when `autoDeployment.status === "deployed"`, the green "Deploy Now" button swaps to "Connect Domain" + an "Open live" link to the deployed URL. New props: `onConnectDomain`, `deployedUrl` plumbed from `BuilderPage`. data-testid: `chat-connect-domain-button`, `chat-open-live-button`.
+- Homepage subhead reworded: founder/MVP-first, dropped enterprise-y "AI-native platform" phrasing.
+
+### Phase B — Notification Center + unified Agent Threads
+- **New backend route** `routes/notifications.py` (`/api/notifications/*`) with `emit()` helper. Stored in Mongo collection `notifications` with `{id, user_id, kind, title, body, link, read, created_at}`.
+- **Notification emitters wired**: `workflow_service.py` (build_complete, build_failed) and `social_content_service.py` (social_generated).
+- **New frontend component** `NotificationCenter.jsx` — bell icon, unread badge, slide-down panel with mark-read / mark-all-read / navigate-to-link. Mounted in `WorkspaceShell` header AND `builder/AppHeader.jsx` so it's reachable from every page. Polls `/list` every 30s.
+- **New backend route** `routes/agent_threads.py` (`/api/agents/threads`, `/api/agents/runs`) — durable task threads with message history, status, logs, outputs. Endpoints: create / list / get / patch (rename/pin/archive) / delete; runs: create / list / get / cancel / fork (with parent_run_id + message-history carry-over).
+
+### Phase C — Durable workflows (resume after tab close)
+- Added `_workflow_recovery_loop()` to `server.py` startup hooks. Sweeps Mongo every 5min for workflows stuck in `running`/`queued` with no live in-process task and re-spawns them.
+- Workflows in `_RUNNING_TASKS` registry — fresh `start_workflow()` calls register their task too so the sweeper doesn't double-spawn.
+- 24h stall → auto-fails (so the sweep doesn't churn forever).
+
+### Phase D — Premium UI registry + pipeline discipline
+- Verified `data/ui_registry.json` already lists shadcn / Magic UI / Aceternity / Origin UI / framer-motion / R3F — generator pulls from this.
+- Verified `services/providers/registry.py` already prioritizes Claude (`anthropic`) first for code-generation / architecture / debug tasks.
+- Verified `streamReducer.js` already serializes phases (inferring → foundation → planning → editing → routes → validating → repairing → preview → deploy).
+- No code changes here — system was already aligned to the brief's spec.
+
+### Phase E — URL Revamp / Import
+- **New service** `services/url_import_service.py` — fetches a live URL (httpx, BeautifulSoup), extracts brand + hero + nav + sections + palette + fonts into a structured `blueprint`.
+- **New route** `POST /api/projects/import/url` — creates a project seeded with the blueprint (stored under `analysis.revamp_blueprint`) so the builder can revamp on first chat. Frontend: new "From URL" tab in the Import dialog on `WorkspaceHome`, calls the route with `mode: "revamp"`.
+
+### Verified end-to-end
+- `curl /api/notifications/list` → returns list + unread count.
+- `curl /api/agents/threads` → create + run lifecycle (queued state persisted).
+- `curl /api/projects/import/url` with `example.com` → returns blueprint with hero title "Example Domain", sections extracted.
+- Workflow start → 5s later notifications list shows `build_complete` notification with link `/builder/{id}`.
+- Screenshot: bell mounts in workspace header, panel opens on click, "Build ready" notification visible inside.
+
+
 ## 2026-05-14 — Clean break from Emergent + UX fixes
 
 ### Removed Emergent coupling (per user request — self-hosting with own keys)

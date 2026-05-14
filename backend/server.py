@@ -76,6 +76,8 @@ from routes.social import router as social_router  # noqa: E402
 from routes.video import router as video_router  # noqa: E402
 from routes.social_oauth import router as social_oauth_router  # noqa: E402
 from routes.agent_memory import router as agent_memory_router  # noqa: E402
+from routes.notifications import router as notifications_router  # noqa: E402
+from routes.agent_threads import router as agent_threads_router  # noqa: E402
 from services.social_scheduler import scheduler_loop as social_scheduler_loop  # noqa: E402
 from routes._deps import db as _shared_db  # noqa: E402
 
@@ -129,6 +131,8 @@ for r in (
     video_router,
     social_oauth_router,
     agent_memory_router,
+    notifications_router,
+    agent_threads_router,
 ):
     app.include_router(r)
 
@@ -153,6 +157,27 @@ async def on_startup():
         logger.info("social scheduler loop started")
     except Exception as e:
         logger.warning(f"social scheduler not started: {e}")
+    # Phase C — Durable workflows: resume any orphaned in-process workflows
+    # that were running when the previous process died (e.g. Render redeploy).
+    # We sweep on boot AND every 5min so newly-orphaned workflows recover.
+    try:
+        from services.workflow_service import resume_orphaned_workflows
+        asyncio.create_task(_workflow_recovery_loop())
+        logger.info("workflow recovery loop started")
+    except Exception as e:
+        logger.warning(f"workflow recovery not started: {e}")
+
+
+async def _workflow_recovery_loop():
+    """Sweep MongoDB for workflows stuck in 'running' state with no live
+    process and re-spawn them. Runs once on boot, then every 5 minutes."""
+    from services.workflow_service import resume_orphaned_workflows
+    while True:
+        try:
+            await resume_orphaned_workflows()
+        except Exception as e:
+            logger.warning(f"workflow recovery tick failed: {e}")
+        await asyncio.sleep(300)
 
 
 @app.on_event("shutdown")

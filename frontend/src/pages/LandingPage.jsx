@@ -296,12 +296,11 @@ export default function LandingPage() {
         </div>
 
         <p
-          className="text-center text-[14px] sm:text-[15px] max-w-[600px] mx-auto mb-5 sm:mb-6 leading-relaxed"
+          className="text-center text-[14px] sm:text-[15px] max-w-[560px] mx-auto mb-5 sm:mb-6 leading-relaxed"
           style={{ color: "var(--nxt-fg-dim)" }}
         >
-          An AI-native platform for founders, builders, and serious teams shipping MVPs,
-          internal tools, dashboards, and full-stack software. Create, host, and deploy
-          from one place.
+          Turn an idea into a real, hosted app — fast. For founders building MVPs,
+          teams shipping internal tools, and anyone tired of starter templates.
         </p>
 
         {/* Jwood Technologies signature — replaces the limited-access pill.

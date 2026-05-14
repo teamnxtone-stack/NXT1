@@ -21,39 +21,13 @@ import api from "@/lib/api";
 
 const POLL_MS = 8_000;
 
-export function useAgentActivityWatcher(enabled = true) {
-  const lastRunning = useRef(new Set());
-  useEffect(() => {
-    if (!enabled) return;
-    let cancel = false;
-    let token = (() => {
-      try { return JSON.parse(localStorage.getItem("nxt1-auth") || "{}").token; }
-      catch { return null; }
-    })();
-    if (!token) return; // not logged in, skip
-
-    const poll = async () => {
-      try {
-        const { data } = await api.get("/agents/conversations/active");
-        if (cancel) return;
-        const nowRunning = new Set((data || []).map((c) => c.id));
-        // Detect transitions: id was in lastRunning but is no longer running
-        for (const id of lastRunning.current) {
-          if (!nowRunning.has(id)) {
-            // Need to fetch the conversation to learn its name
-            api.get(`/agents/conversations/${id}`).then(({ data: conv }) => {
-              const name = conv?.item_name || "Agent";
-              notifyDone(name);
-            }).catch(() => notifyDone("Agent"));
-          }
-        }
-        lastRunning.current = nowRunning;
-      } catch { /* network blip, ignore */ }
-    };
-    poll();
-    const t = setInterval(poll, POLL_MS);
-    return () => { cancel = true; clearInterval(t); };
-  }, [enabled]);
+export function useAgentActivityWatcher(enabled = true) { // eslint-disable-line no-unused-vars
+  // DISABLED — replaced by the durable NotificationCenter (Phase B).
+  // The legacy polling on /agents/conversations/active was firing random
+  // bottom toasts on every page (including builder + social) which the user
+  // flagged as confusing. Notifications now live in the bell-icon panel and
+  // are seeded server-side by the workflow + social schedulers.
+  return;
 }
 
 function notifyDone(name) {

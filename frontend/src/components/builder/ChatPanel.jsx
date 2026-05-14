@@ -14,6 +14,7 @@ import {
   Share2,
   Activity,
   Cpu,
+  Globe2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,7 +48,7 @@ const FOLLOWUPS = [
   "Mobile-first pass",
 ];
 
-export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdated, onAutoDeploy, onPreviewClick, onDeployClick, onDeployNow, onSaveToGithub, onSharePreview }) {
+export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdated, onAutoDeploy, onPreviewClick, onDeployClick, onDeployNow, onSaveToGithub, onSharePreview, onConnectDomain, deployedUrl }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -692,6 +693,8 @@ export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdate
                 }
               }}
               onPickProvider={() => onDeployClick?.()}
+              onConnectDomain={() => onConnectDomain?.()}
+              deployedUrl={deployedUrl}
             />
             <div className="flex flex-wrap gap-1.5 mt-3">
               {FOLLOWUPS.map((f) => (
@@ -879,7 +882,7 @@ function AgentBrief({ receipts, className = "" }) {
  * primary "Deploy Now" CTA. Auto-Vercel by default; "Pick provider" opens the
  * full Deploy sheet for users who want CF Pages or internal preview.
  */
-function BuildSummaryCard({ summary, deploying, sharing, onDeployNow, onPreviewClick, onSharePreview, onPickProvider }) {
+function BuildSummaryCard({ summary, deploying, sharing, onDeployNow, onPreviewClick, onSharePreview, onPickProvider, onConnectDomain, deployedUrl }) {
   const counts = (summary?.receipts || []).reduce(
     (acc, r) => {
       acc[r.action] = (acc[r.action] || 0) + 1;
@@ -944,20 +947,44 @@ function BuildSummaryCard({ summary, deploying, sharing, onDeployNow, onPreviewC
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onDeployNow}
-          disabled={deploying}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-400 text-black text-sm font-semibold shadow hover:bg-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
-          data-testid="chat-deploy-now-button"
-        >
-          {deploying ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Rocket size={14} strokeWidth={2.5} />
-          )}
-          {deploying ? "Deploying…" : "Deploy Now"}
-        </button>
+        {deployedUrl ? (
+          <button
+            type="button"
+            onClick={onConnectDomain || onPickProvider}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-400 text-black text-sm font-semibold shadow hover:bg-emerald-300 transition"
+            data-testid="chat-connect-domain-button"
+          >
+            <Globe2 size={14} strokeWidth={2.5} />
+            Connect Domain
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onDeployNow}
+            disabled={deploying}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-400 text-black text-sm font-semibold shadow hover:bg-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            data-testid="chat-deploy-now-button"
+          >
+            {deploying ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Rocket size={14} strokeWidth={2.5} />
+            )}
+            {deploying ? "Deploying…" : "Deploy Now"}
+          </button>
+        )}
+        {deployedUrl && (
+          <a
+            href={deployedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-2.5 rounded-full bg-transparent border border-emerald-400/30 text-emerald-300 text-sm hover:bg-emerald-400/10 transition"
+            data-testid="chat-open-live-button"
+          >
+            <ExternalLink size={13} />
+            Open live
+          </a>
+        )}
         {onSharePreview && (
           <button
             type="button"

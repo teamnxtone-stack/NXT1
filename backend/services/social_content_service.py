@@ -440,6 +440,19 @@ async def run_social_job(
             f"Done — {len(created)} posts created.",
             phase="completed", progress=1.0,
         )
+        # Durable bell notification
+        try:
+            from routes import notifications as _notifs
+            await _notifs.emit(
+                user_id,
+                kind="social_generated",
+                title=f"Social calendar ready — {len(created)} posts",
+                body=f"Topics: {', '.join(p.get('topic', '')[:40] for p in created[:3])}",
+                link="/workspace/social",
+                meta={"job_id": job_id, "post_count": len(created)},
+            )
+        except Exception:
+            pass
 
         # Auto-write: store a summary so the next run is smarter
         try:
