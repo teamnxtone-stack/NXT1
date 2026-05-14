@@ -76,9 +76,12 @@ class PostToSocialBody(BaseModel):
 
 @router.get("/health")
 async def health(_user: str = Depends(verify_token)):
+    from services.video_studio_service import _ffmpeg_binary
+    ff = _ffmpeg_binary()
     return {
         "fal_configured": bool(os.environ.get("FAL_API_KEY")),
-        "ffmpeg_available": bool(os.popen("which ffmpeg").read().strip()),
+        "ffmpeg_available": bool(ff),
+        "ffmpeg_path": ff,
         "ok": True,
     }
 

@@ -299,6 +299,23 @@ async def save_reference_image(user_id: str, file_bytes: bytes, filename: str) -
 
 
 # ─────────────────────────────────────────────────── ffmpeg-based multi-clip export
+def _ffmpeg_binary() -> str:
+    """Return path to ffmpeg binary.
+
+    Prefers system ffmpeg (faster cold-start). Falls back to imageio-ffmpeg's
+    bundled static binary — critical for Render's Python runtime which does
+    NOT include ffmpeg system-wide.
+    """
+    sys_ff = subprocess.run(["which", "ffmpeg"], capture_output=True).stdout.decode().strip()
+    if sys_ff:
+        return sys_ff
+    try:
+        import imageio_ffmpeg  # noqa: WPS433
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return "ffmpeg"
+
+
 def _ffmpeg_concat(input_paths: list[str], output_path: str) -> None:
     """Concatenate multiple mp4 clips into one via ffmpeg concat filter.
 
@@ -306,8 +323,8 @@ def _ffmpeg_concat(input_paths: list[str], output_path: str) -> None:
     """
     if not input_paths:
         raise RuntimeError("No inputs to concat")
-    # Build command: -i in1 -i in2 ... -filter_complex "[0:v:0][0:a:0?][1:v:0][1:a:0?]concat=n=2:v=1:a=1[v][a]" -map "[v]" -map "[a]?" out
-    cmd: list[str] = ["ffmpeg", "-y"]
+    ff = _ffmpeg_binary()
+    cmd: list[str] = [ff, "-y"]
     for p in input_paths:
         cmd += ["-i", p]
     parts = []
