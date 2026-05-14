@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 6 — Full E2E AgentOS + App Builder verification. 14/14 backend tests PASS, all frontend critical flows PASS. The previously-broken GET /api/agentos/tasks NaN-serialization bug is FIXED. All 5 agents (custom, job_scout, founders_scout, social_strategist, resume_tailor) registered, run end-to-end, and return well-formed JSON. App-builder regression resolved: POST /api/projects now auto-starts workflows (iter4 critical fixed). UI: back-arrow 'Workspace' button present at top-left of /agentos with data-testid='agentos-back', navigates to /admin on click. Theme switching works: dark rgb(43,43,49) → light cream rgb(251,248,239). All 5 status cards + all 5 tab pages render. New-task submission produces task pills. Codebase is ready to ship — only one Emergent-default URL remains (env-overridable fallback in agentos_agents.py:112).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter6_agentos_full.py",
+    "/app/test_reports/pytest/iter6_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (pre-ship hygiene): backend/services/agentos_agents.py line 112 uses 'https://integrations.emergentagent.com' as the default for EMERGENT_BASE_URL. This is env-overridable so it works fine on a self-hosted server when the env var is set, but the user may want to either (a) make the default a configurable constant at the top of the file, or (b) raise if EMERGENT_BASE_URL is unset to fail-fast on misconfig. Not blocking.",
+    "OPTIONAL: backend/tests/test_agentos_live.py:16 and backend/tests/test_phase6_r3.py:15 still hardcode preview.emergentagent.com URLs. Those are test files only — fine for THIS env but the user should update or skip them on the self-hosted target."
+  ],
+  "critical_code_review_comments": [
+    "agentos_runner.py _sanitize() correctly walks dict/list/tuple and replaces NaN/Inf with None — verified by direct hit of GET /api/agentos/tasks?limit=30 after multiple JobSpy runs in the DB.",
+    "Frontend AgentOSDashboard.jsx correctly inherits theming via CSS vars (--nxt-bg, --nxt-surface, --nxt-accent). Theme toggle confirmed end-to-end (data-theme attribute on <html> flips both bg and text contrast).",
+    "All 14 backend test endpoints assert response BODY shape, not just status code (per pytest_guidelines). Agent runs verified by polling /tasks/{id} until status='done' and asserting required result fields (e.g. resume_tailor: ats_score/keyword_coverage/cosine_similarity/jd_keywords/matched/missing/tailored_resume/suggestions/report all present)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter6_agentos_full.py",
+    "/app/test_reports/pytest/iter6_results.xml",
+    "/app/test_reports/iteration_5.json"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14)",
+    "frontend": "100% (all critical flows verified: back-button, theme switch, 5 status cards, 5 tab pages, resume form, new-task submission with task-pill render, /admin loads)"
+  },
+  "test_credentials": "Admin login POST /api/auth/login {password:'555'} → {token: <JWT>}. Use as Authorization: Bearer <token>. Confirmed working.",
+  "seed_data_creation": "Each pytest run creates 5 agent tasks (custom/job_scout/founders_scout/social_strategist/resume_tailor with TEST labels) and 1 TEST_iter6_smoke project (cleaned up via DELETE in test teardown). Agent task docs remain in db.agentos_tasks for future runs to verify the NaN fix continues to hold (intentional — they are the regression seeds).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter4 criticals are RESOLVED: (a) workflow auto-start on POST /api/projects — VERIFIED (test_app_builder_create_and_workflow passes, GET /api/workflows/list?project_id=<new> returns >=1 item). (b) NaN-JSON serialization regression — VERIFIED via _sanitize() in agentos_runner.py. AgentOS catalog stats response is shaped {agents: {<id>: {running, last_done, last_at, status, running_now}}} — note the wrapping `agents` key. GET /api/agentos/tasks returns {tasks: [...]} similarly wrapped. Test file /app/backend/tests/test_iter6_agentos_full.py is idempotent and re-runnable; if Resume Tailor poll hits the 180s ceiling, raise to 240s — it's an LLM call. Job Scout is marked accept_failed=True because JobSpy can rate-limit at the public job boards (current run succeeded, no NaN in jobs[]).",
+  "rca of the issue": "No outstanding issues. All previously-reported bugs (NaN-JSON serialization, workflow not auto-starting, prompt-field dropped — verified workflow autostart fix; the prompt-persistence concern from iter4 is orthogonal to this iteration's scope). System is ready for the user to push to GitHub / self-hosted server. Only flagged residual: one Emergent default URL in agentos_agents.py:112 which is env-overridable — confirmed not a blocker."
+}

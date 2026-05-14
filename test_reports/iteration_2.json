@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 20 iteration 2 backend testing complete — 13/13 pytest cases passed. Validated vendored UI blocks endpoints (/implemented count=17, /blocks/{id}/source with text/plain payload, 404 on unknown, annotated block has source_url), new login regression with APP_PASSWORD='555' (old 'nxt1admin' now rejected), workflow reconciliation hook (reconcile_coder_phase) correctly flips coder→done, appends 'Files reconciled from chat stream' history entry, re-runs tester with seeded files, advances to deployer phase, and sets status='waiting'/requires_approval=true. Phase 20 regressions all green: 6 packs + 17 blocks, /workflows/list, /hosting/readiness, /runner/config mode=subprocess, /hosting/caddy/generate includes Strict-Transport-Security HSTS header.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase20_iter2.py",
+    "/app/test_reports/pytest/phase20_iter2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/ui_registry.py _BLOCK_SOURCES dict duplicates state from /app/frontend/src/components/ui/blocks/index.js BLOCK_MAP (comment acknowledges it). Drift risk; consider generating one from the other at build time.",
+    "services/workflow_service.py reconcile_coder_phase swallows all exceptions and only logs a warning — the chat route already has its own try/except wrapping the call, so the inner broad-except mostly masks bugs. Consider re-raising on assertion-like failures (state corruption) and only swallowing IO/Mongo transients.",
+    "routes/chat.py /chat/stream success path emits a 'workflow_reconciled' event into the SSE queue but the non-streaming POST /chat path does NOT surface the reconcile result in its HTTP response. Add `workflow_reconciled` to the response payload for symmetry and so non-SSE clients can update their workflow UI.",
+    "ui_registry GET /blocks/{block_id}/source returns the file as text/plain — that's correct, but it does not set Cache-Control. Since these are immutable vendored files, adding `Cache-Control: public, max-age=3600` would cut backend load when the marketplace fetches sources.",
+    "workflow reconcile rebuilds the 'entry' set inline (duplicated from node_tester). Extract a shared `_has_entry(files)` helper in workflow_service to avoid divergence."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase20_iter2.py",
+    "/app/test_reports/pytest/phase20_iter2_results.xml"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "APP_PASSWORD=555 (was nxt1admin). POST /api/auth/login {password:'555'} returns JWT. Old password 'nxt1admin' now correctly rejected with 401.",
+  "seed_data_creation": "Test creates a TEST_recon_<uuid> project + workflow per run; teardown was performed manually after the test run (2 projects + 2 workflows deleted). Recommend adding a teardown fixture if the suite is re-run frequently.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 2 validated: (a) vendored block endpoints, (b) password rotation to '555', (c) workflow reconciliation function called directly via services.workflow_service.reconcile_coder_phase (bypasses LLM). The end-to-end chat → reconcile path through POST /api/projects/{id}/chat was NOT tested because that path invokes the LLM (Emergent key) which adds 10-30s of timing variability; the direct-service test covers the same code path. If full E2E is desired next iteration, hit /api/projects/{id}/chat with a tiny prompt and assert the workflow document gains the 'Files reconciled from chat stream' entry. All 22 previous Phase 20 tests in test_phase20_four_tracks.py should still pass against APP_PASSWORD=555 if its login fixture is updated (it currently hard-codes 'nxt1admin' — heads up to main agent).",
+  "rca of the issue": "N/A — no production issues found. Two test-only bugs surfaced and were fixed in-test: (1) hosting/caddy/generate body schema expects `domains` (plural array), test was sending `domain` singular — fixed. (2) Two separate asyncio.run() calls created different event loops, but motor's AsyncIOMotorClient is bound to the first one — second call failed with 'Event loop is closed'. Fixed by combining the seed-files write and reconcile call into a single coroutine run inside one asyncio.run(). Note for main agent: a previous iteration's test file test_phase20_four_tracks.py likely still hardcodes password='nxt1admin' and will break if re-run unchanged; please update its auth fixture to use '555'."
+}

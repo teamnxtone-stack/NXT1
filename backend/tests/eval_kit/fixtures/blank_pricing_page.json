@@ -1,0 +1,13 @@
+{
+  "id": "blank-pricing-page",
+  "title": "Build a pricing page from a blank scaffold",
+  "user_message": "Build a modern, dark-themed pricing page with three tiers (Starter, Pro, Enterprise). Use confident typography, generous spacing, and inline SVG icons.",
+  "starting_files": [],
+  "protocol": "json",
+  "expected": {
+    "paths_present": ["index.html"],
+    "keywords_in_any": ["Starter", "Pro", "Enterprise", "pricing"],
+    "no_validation_errors": true,
+    "max_files_changed": 12
+  }
+}

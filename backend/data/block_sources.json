@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-05-14T00:21:10.369Z",
+  "source_of_truth": "frontend/src/components/ui/blocks/index.js BLOCK_MAP",
+  "count": 17,
+  "blocks": {
+    "hero.aceternity.spotlight": {
+      "file": "SpotlightHero.jsx",
+      "named_export": null
+    },
+    "hero.magicui.bento": {
+      "file": "BentoGridHero.jsx",
+      "named_export": null
+    },
+    "hero.aceternity.background-beams": {
+      "file": "BackgroundBeamsHero.jsx",
+      "named_export": null
+    },
+    "card.magicui.shine-border": {
+      "file": "ShineBorderCard.jsx",
+      "named_export": null
+    },
+    "card.aceternity.3d-pin": {
+      "file": "ThreeDPinCard.jsx",
+      "named_export": null
+    },
+    "feature.magicui.marquee": {
+      "file": "LogoMarquee.jsx",
+      "named_export": null
+    },
+    "feature.magicui.orbiting-circles": {
+      "file": "OrbitingCircles.jsx",
+      "named_export": null
+    },
+    "feature.aceternity.bento-grid": {
+      "file": "AceternityBento.jsx",
+      "named_export": null
+    },
+    "text.magicui.animated-gradient": {
+      "file": "Primitives.jsx",
+      "named_export": "AnimatedGradientText"
+    },
+    "text.magicui.typing-animation": {
+      "file": "Primitives.jsx",
+      "named_export": "TypingAnimation"
+    },
+    "background.magicui.dot-pattern": {
+      "file": "Primitives.jsx",
+      "named_export": "DotPattern"
+    },
+    "background.aceternity.wavy": {
+      "file": "Primitives.jsx",
+      "named_export": "WavyBackground"
+    },
+    "background.aceternity.meteors": {
+      "file": "Primitives.jsx",
+      "named_export": "Meteors"
+    },
+    "input.originui.search-with-shortcut": {
+      "file": "Primitives.jsx",
+      "named_export": "SearchWithShortcut"
+    },
+    "input.originui.password-strength": {
+      "file": "Primitives.jsx",
+      "named_export": "PasswordStrengthInput"
+    },
+    "scene.r3f.particles": {
+      "file": "R3FFallbacks.jsx",
+      "named_export": "ParticleField"
+    },
+    "scene.r3f.globe": {
+      "file": "R3FFallbacks.jsx",
+      "named_export": "AnimatedGlobe"
+    }
+  }
+}

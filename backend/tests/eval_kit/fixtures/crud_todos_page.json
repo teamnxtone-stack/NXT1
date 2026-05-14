@@ -1,0 +1,13 @@
+{
+  "id": "crud-todos-page",
+  "title": "Build a single-page CRUD todo list with localStorage persistence",
+  "user_message": "Build a single-page todo list app. Users can add a new todo (text input + Add button), mark todos complete (checkbox), and delete todos (X button). Persist the list in localStorage so it survives reload. Dark theme.",
+  "starting_files": [],
+  "protocol": "json",
+  "expected": {
+    "paths_present": ["index.html"],
+    "keywords_in_any": ["addEventListener", "localStorage", "todo", "delete", "complete"],
+    "no_validation_errors": true,
+    "max_files_changed": 8
+  }
+}

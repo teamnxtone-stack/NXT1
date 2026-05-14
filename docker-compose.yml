@@ -1,0 +1,80 @@
+version: "3.9"
+
+# NXT1 + AgentOS — self-hosting compose
+# `docker compose up -d` on a fresh box brings the whole stack online.
+# See SELF_HOSTING.md for prerequisites + first-boot walkthrough.
+
+services:
+  # ── Core NXT1 (FastAPI + React) ─────────────────────────────────────
+  app:
+    image: ghcr.io/${GITHUB_REPOSITORY:-nxt1/nxt1}:latest
+    build: .
+    ports:
+      - "8000:8000"     # backend
+      - "3000:3000"     # frontend (Next.js / Vite dev or built)
+    env_file: .env
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379
+      DB_NAME: nxt1
+    depends_on: [mongo, redis]
+    restart: unless-stopped
+
+  # ── bolt.diy — open-source app builder UI (Sidecar, embedded as iframe) ──
+  # Optional: only runs when you `--profile builder` it. Heavy image.
+  bolt-engine:
+    profiles: ["builder"]
+    image: ghcr.io/stackblitz-labs/bolt.diy:latest
+    ports: ["5173:5173"]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    restart: unless-stopped
+
+  # ── Postiz — social scheduler (Optional, iframe-embedded in Social tab) ──
+  postiz:
+    profiles: ["social"]
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    ports: ["5000:5000"]
+    environment:
+      MAIN_URL: http://localhost:5000
+      FRONTEND_URL: http://localhost:5000
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+      JWT_SECRET: ${POSTIZ_SECRET_KEY}
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/postiz
+      REDIS_URL: redis://redis:6379
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+
+  # ── LiveKit voice worker (Optional, depends on LIVEKIT_* env vars) ──
+  livekit-agent:
+    profiles: ["voice"]
+    build:
+      context: .
+      dockerfile: Dockerfile.livekit
+    env_file: .env
+    restart: unless-stopped
+    command: python -m backend.agents.voice_agent start
+
+  # ── Datastores ──────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    volumes: [mongo_data:/data/db]
+    restart: unless-stopped
+
+  postgres:
+    profiles: ["social"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postiz
+      POSTGRES_PASSWORD: password
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  postgres_data:

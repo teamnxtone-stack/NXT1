@@ -1,0 +1,38 @@
+{
+  "id": "dark-mode-toggle",
+  "title": "Add a dark-mode toggle to an existing site that persists in localStorage",
+  "user_message": "Add a dark-mode toggle button in the top-right corner of every page. When clicked, it should toggle a `data-theme` attribute on the html element between 'light' and 'dark', and persist the choice in localStorage so it survives reload. Style both themes via CSS variables.",
+  "starting_files": [
+    {
+      "path": "index.html",
+      "content": "<!doctype html><html><head><meta charset='utf-8'><title>NXT1 site</title><link rel='stylesheet' href='styles/main.css'></head><body><header class='topbar'><span class='logo'>NXT1</span></header><main class='hero'><h1>Welcome</h1><p>This is a sample landing page.</p></main><script src='scripts/app.js'></script></body></html>"
+    },
+    {
+      "path": "about.html",
+      "content": "<!doctype html><html><head><title>About</title><link rel='stylesheet' href='styles/main.css'></head><body><header class='topbar'><span class='logo'>NXT1</span></header><main class='hero'><h1>About us</h1></main><script src='scripts/app.js'></script></body></html>"
+    },
+    {
+      "path": "styles/main.css",
+      "content": ":root { --bg:#fff; --fg:#111; --accent:#5eead4; }\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }\n.topbar { display:flex; justify-content:space-between; padding: 16px 32px; }\n.hero { padding: 120px 32px; text-align: center; }\n"
+    },
+    {
+      "path": "scripts/app.js",
+      "content": "console.log('NXT1 site loaded');\n"
+    },
+    {
+      "path": "package.json",
+      "content": "{\"name\":\"nxt1-site\",\"private\":true,\"version\":\"0.1.0\"}\n"
+    },
+    {
+      "path": "README.md",
+      "content": "# NXT1 Site\n"
+    }
+  ],
+  "protocol": "tag",
+  "expected": {
+    "paths_present": ["index.html", "about.html", "styles/main.css", "scripts/app.js"],
+    "keywords_in_any": ["localStorage", "data-theme", "toggle", "dark"],
+    "no_validation_errors": true,
+    "max_files_changed": 5
+  }
+}

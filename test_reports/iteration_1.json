@@ -1,0 +1,36 @@
+{
+  "summary": "Phase 20 backend testing across all 4 new tracks (UI Registry, Workflows, Hosting, Runner) plus regression. 22/22 pytest cases passed against the public REACT_APP_BACKEND_URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase20_four_tracks.py",
+    "/app/test_reports/pytest/phase20_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "workflow_service.start_workflow has a dead-code pattern: `await COL.update_one(...) if False else None` (line ~342). Harmless but should be removed for clarity.",
+    "routes/workflows.py /start does not validate that prompt is non-empty (Pydantic only requires presence). Consider min_length=1.",
+    "routes/runner.py self-heal SSE catches all exceptions but emits the message inline; consider also logging server-side for observability (currently relies on caller).",
+    "routes/hosting.py cf_connect length check is len<20 — magic number; consider a named constant.",
+    "ui_registry.py uses a module-level _CACHE dict; if registry JSON is hot-edited it will not reload until process restart (acceptable for prod, document it).",
+    "workflow cancel endpoint returns 400 on already-terminal workflows — that's fine, but the response body is just a generic message; clients can't distinguish 'not found' vs 'already terminal'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase20_four_tracks.py",
+    "/app/test_reports/pytest/phase20_results.xml"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "APP_PASSWORD=nxt1admin (from /app/backend/.env). POST /api/auth/login {password:'nxt1admin'} returns JWT.",
+  "seed_data_creation": "Tests create a fresh project per-session via POST /api/projects with name prefix 'TEST_phase20_'. No persistent cleanup; trivial test data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full Phase 20 backend suite lives at /app/backend/tests/test_phase20_four_tracks.py and covers: UI registry (6 packs/17 blocks, kind+pack filters, directive, block-by-id 200/404), workflow lifecycle (start->poll->resume->complete + cancel + 404), hosting (readiness, Caddy generate w/HSTS+compose, install-guide, CF status default-disconnected, CF connect short/long invalid tokens), runner (config mode=subprocess, quick-build, self-heal SSE first event with max_attempts=1), and regression on /system/ready, /auth/login, /scaffolds (>=10), /ai/providers (8). All 22 pass in ~6s.",
+  "rca of the issue": "No bugs found — clean run."
+}

@@ -1,0 +1,79 @@
+{
+  "summary": "Iteration 4 — Full E2E NXT1 production-path audit. 20 tests written across login, project lifecycle, workflows, chat-LLM, preview, deploy, manual/auto domains, env vars, asset upload, AI routing, Agent OS. Result: 15/20 PASSED (75%). Five FAILURES — all map to user's explicitly requested features that are NOT working end-to-end. Most important finding: the multi-model AI routing the user specifically asked us to confirm is in fact HARDCODED to a single provider ('emergent'), so Claude/OpenAI/Gemini are NOT picked per task. Other criticals: workflow does NOT auto-start on project creation; full /chat happy path returns 502 'AI returned no files'; internal deploy is incompatible with the platform's own Next.js scaffold ('index.html not found'); the initial `prompt` user sends to POST /projects is accepted but silently dropped (never persisted, never echoed back).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/ai/task-routing",
+        "issue": "User's #1 ask was to confirm multi-model routing actually picks Claude/OpenAI/Gemini by task. It does NOT. Every task in the suggestions map resolves to provider='emergent' (the universal-key wrapper). The routing table+suggestions are NOT actually role-aware across underlying providers. From the user's perspective, the platform is single-provider regardless of task. Code: services/providers/task_routing.py + services/providers/catalog.py.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST /api/projects",
+        "issue": "Workflow does NOT auto-start when a project is created. GET /api/workflows/list?project_id=<new id> returns {items: []} immediately after POST /projects. Spec explicitly requires auto-started workflow. routes/projects.py create_project() inserts the doc and returns — there is no call into services.workflow_service to spawn the planner/builder/tester/deployer pipeline.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST /api/projects/{id}/chat",
+        "issue": "End-to-end chat returned 502 with detail 'AI returned no files'. Backend reached the LLM (Emergent key) but the JSON parser yielded an empty files array, so chat raises AIProviderError. Net effect: the headline 'prompt → app' loop does not complete via the supported non-streaming endpoint. Reproduced with prompt 'Add a footer with copyright text' against a fresh Next.js scaffold. Look at services/ai_service.py + services/parsers/ (parse_ai_response).",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST /api/projects/{id}/deploy  (internal)",
+        "issue": "Internal-provider deploy fails on the platform's OWN scaffold. Deployment record status='failed' with logs '✗ index.html not found' / error='Missing index.html'. The fresh Next.js scaffold has app/page.jsx and app/layout.jsx — no index.html — so the static internal provider is structurally incompatible with the default scaffold NXT1 itself creates. Either the internal provider must build the Next.js project first, or the scaffold must emit a static export. Code: services/deploy/internal_provider (whatever provides the get_deploy_provider('internal') instance).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/projects",
+        "issue": "MAJOR (not critical only because nothing else in the API reads it back): the `prompt` field on ProjectCreate is accepted, used to infer scaffold kind via inference_service, then THROWN AWAY. It is not stored on the project doc and not returned in ProjectFull. So 'list project / get project' clients can never recover what the user originally asked for. The agent_os/chat history have to fish it out of doc['messages'] instead — which is empty right after create. Suggest persisting `prompt` on the doc + adding it to ProjectFull."
+      },
+      {
+        "endpoint": "GET /api/projects/{id}/preview/url",
+        "issue": "Endpoint does not exist (405/404). The actual preview endpoints are /preview-info, /preview (POST/GET/DELETE). Either add a /preview/url alias for client convenience or update API docs/spec wording."
+      },
+      {
+        "endpoint": "GET /api/workflows/list",
+        "issue": "Response shape is {'items': [...]} (object with items key) rather than a bare list. Many spec-readers would expect a list. Not a bug, just a shape note for clients."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_e2e_audit.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Fix AI routing in services/providers/task_routing.py + catalog.py so suggestions actually pick anthropic/openai/gemini per task (frontend→anthropic, planner→openai/anthropic, large-context→gemini). The 'emergent' universal key is a TRANSPORT, not a provider — the routing layer should still report which underlying model family is picked. The user specifically called this out.",
+    "CRITICAL: Auto-start a workflow inside create_project (routes/projects.py) — call workflow_service.start_workflow(project_id, prompt) after db.projects.insert_one. Today the workflow is only started by the chat-streaming endpoint, so a freshly-created project always shows empty workflow list.",
+    "CRITICAL: Fix POST /api/projects/{id}/chat 'AI returned no files'. The LLM is reachable but the parser returns zero files for natural-language follow-ups against a populated scaffold. Either (a) widen the parser to accept patch/diff-style output, or (b) make the chat prompt instruct the LLM to always emit the full files block. Reproduce: create project, then POST /chat with 'Add a footer with copyright text' → 502.",
+    "CRITICAL: Internal deploy provider is incompatible with the Next.js scaffold the platform itself creates. Either (1) teach internal_provider to run `next build && next export` (or equivalent static-export) before serving, or (2) make scaffold detection pick the static-html scaffold for prompts that are pure landing pages, or (3) gate the 'internal' provider behind a static-html capability check and surface a clear UX message instead of letting the deployment fail with 'Missing index.html'.",
+    "MAJOR: Persist `prompt` on the project document and include it in ProjectFull response. Currently the user's original ask is silently dropped, which breaks downstream agent context, audit, and 'reopen' flows.",
+    "MINOR: Add GET /api/projects/{id}/preview/url alias, or document that callers should use /preview-info."
+  ],
+  "critical_code_review_comments": [
+    "services/providers/task_routing.py routes everything to provider='emergent' — that's the transport wrapper, not a model choice. The routing should still resolve to a concrete underlying provider (openai/anthropic/gemini) so the UI and downstream code can show which model handled which role.",
+    "routes/projects.py create_project: workflow auto-start is missing. The 'prompt' field is accepted then discarded — both should be fixed in one PR.",
+    "routes/deployments.py internal provider error 'Missing index.html' is currently logged but the deployment-failed status is returned with a generic shape. Surface the failure_reason in the response so the new DeployAndDomainSheet can show 'this scaffold isn't statically deployable, build first' instead of just 'failed'.",
+    "routes/chat.py non-streaming /chat correctly returns workflow_reconciled key in the response (good — that part of phase-20 iter2 work landed). But the upstream AIProviderError path doesn't carry workflow_reconciled, so callers that key off it will get inconsistent shapes between success and 502.",
+    "routes/agentos.py is at prefix /api/v1/agentos while everything else is /api — inconsistent. Either move to /api/agentos or document the split."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_e2e_audit.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "success_rate": {
+    "backend": "75% (15/20)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "test_credentials": "APP_PASSWORD=555. POST /api/auth/login {password:'555'} returns {access_token}. EMERGENT_LLM_KEY is set in /app/backend/.env and was used for the live /chat hit.",
+  "seed_data_creation": "Each pytest run creates one TEST_iter4_<hex8> project + one transient asset + one transient domain + one transient env var. Project teardown is in the session fixture (DELETE /api/projects/{id}) so no manual cleanup needed. If a run is killed mid-way, search db.projects for name regex ^TEST_iter4_ to clean up.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Iteration 4 was an audit pass — 15/20 endpoints validated, 5 production-path failures classified for triage. The 5 failures are all REAL backend issues, NOT test-script bugs (verified by inspecting routes/projects.py, routes/deployments.py, routes/chat.py, services/providers/task_routing.py). After main agent fixes any of the 4 criticals, re-run `pytest /app/backend/tests/test_iter4_e2e_audit.py -v --tb=short` — it's idempotent (creates+deletes its own project). KEY GOTCHAS: (1) project create response does NOT echo `prompt` even though it accepts it — don't write tests that assert on it until main agent fixes that. (2) Workflows list response shape is {'items': [...]} not a bare list. (3) AI task-routing suggestions key currently reports provider='emergent' uniformly — once fixed, will report 'anthropic'/'openai'/'gemini'. (4) `/api/agentos` lives at `/api/v1/agentos` — note the v1 prefix. (5) /api/agents/lifecycle is unauthenticated (no Depends(verify_token)), unlike most agents/* routes. (6) Live LLM call via Emergent key works (provider returned text), but parser yields zero files for follow-up edit prompts on populated scaffolds — that's the real RCA for the chat 502.",
+  "rca of the issue": "RCA — 5 failures, all real, all in user-facing happy-path:  (1) AI routing single-provider: services/providers/task_routing.py and the catalog merge in services/providers/catalog.py both wire every task to the 'emergent' transport wrapper instead of distributing across underlying model families. The Emergent universal-key was integrated as a top-level provider id rather than as a transport for openai/anthropic/gemini, so the routing 'table' just always points back to itself.  (2) Workflow not auto-started: routes/projects.py create_project() ends with db.projects.insert_one(doc); there is no call into services.workflow_service to spawn a workflow row. Today only POST /chat/stream creates workflows. Fix: after insert, call await workflow_service.start_workflow(pid, body.prompt or body.description or '').  (3) /chat 502 'AI returned no files': services/ai_service.generate_project asks the LLM for a JSON files block. For follow-up natural-language edits ('Add a footer…') on an existing scaffold, the LLM sometimes returns prose / partial-file output that fails the strict parser. Fix path: prompt-engineer to always emit the full files array OR widen parse_ai_response to tolerate prose+partial files and fall back to a no-op response instead of 502.  (4) Internal deploy provider 'Missing index.html': the static-internal provider only knows how to serve top-level index.html, but the default scaffold is Next.js (app/page.jsx). The platform creates content the platform itself cannot deploy. Fix: add a static-export step in internal_provider for next/react/vue scaffolds OR make the default scaffold static-html for landing-page prompts.  (5) prompt-field dropped: ProjectCreate.prompt is consumed by inference_service.infer_project_kind() then discarded — never persisted on the doc and never echoed in ProjectFull. Mitigation: add doc['prompt'] = body.prompt and ProjectFull.prompt field."
+}

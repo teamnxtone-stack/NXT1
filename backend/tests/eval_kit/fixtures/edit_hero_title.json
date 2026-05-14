@@ -1,0 +1,42 @@
+{
+  "id": "edit-hero-title",
+  "title": "Change a hero title via surgical edit on existing project",
+  "user_message": "Change the hero title from 'Welcome' to 'Build anything from a sentence'.",
+  "starting_files": [
+    {
+      "path": "index.html",
+      "content": "<!doctype html><html><head><link rel='stylesheet' href='styles/main.css'></head><body><header class='hero'><h1 class='hero-title'>Welcome</h1><p class='hero-sub'>NXT1 builds real software.</p></header></body></html>"
+    },
+    {
+      "path": "styles/main.css",
+      "content": "body{background:#0b0b0c;color:#eaeaea;font-family:system-ui}\n.hero{padding:120px 24px;text-align:center}\n.hero-title{font-size:clamp(2.5rem,6vw,4.5rem);letter-spacing:-0.02em}\n.hero-sub{opacity:.7;max-width:520px;margin:16px auto}"
+    },
+    {
+      "path": "scripts/app.js",
+      "content": "console.log('NXT1');"
+    },
+    {
+      "path": "README.md",
+      "content": "# NXT1 Project"
+    },
+    {
+      "path": "about.html",
+      "content": "<!doctype html><html><body><h1>About</h1></body></html>"
+    },
+    {
+      "path": "contact.html",
+      "content": "<!doctype html><html><body><h1>Contact</h1></body></html>"
+    },
+    {
+      "path": "package.json",
+      "content": "{\"name\":\"nxt1-app\",\"private\":true}"
+    }
+  ],
+  "protocol": "tag",
+  "expected": {
+    "paths_present": ["index.html", "styles/main.css", "package.json"],
+    "keywords_in_any": ["Build anything from a sentence"],
+    "no_validation_errors": true,
+    "max_files_changed": 3
+  }
+}

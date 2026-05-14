@@ -1,0 +1,1476 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,700,500,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smooth scroll for in-page anchor jumps (landing-section-nav). */
+html {
+  scroll-behavior: smooth;
+}
+
+/* =====================================================================
+   NXT1 — Phase 10 Carbon Black Aesthetic
+   Deep graphite, cinematic glow, premium developer-tooling polish.
+   References: Linear, Vercel, Raycast, blink.new, Base44.
+   ===================================================================== */
+:root {
+    /* Carbon graphite scale — exact user spec (matte premium industrial)
+       Primary #2B2B31, layered with #1F1F23 / #242428 / #303038 / #3A3A42  */
+    --nxt-bg:           #2B2B31;   /* base — matte graphite */
+    --nxt-bg-2:         #242428;   /* second layer / sidebar */
+    --nxt-panel:        #1F1F23;   /* recessed panels (deeper) */
+    --nxt-surface:      #303038;   /* raised card surface */
+    --nxt-surface-2:    #34343C;   /* elevated card */
+    --nxt-surface-3:    #3A3A42;   /* highest elevation */
+    --nxt-elevated:     #404049;
+
+    /* Borders — extremely subtle, pure neutral */
+    --nxt-border:        rgba(255, 255, 255, 0.06);
+    --nxt-border-strong: rgba(255, 255, 255, 0.10);
+    --nxt-border-glow:   rgba(94, 234, 212, 0.22);
+    --nxt-border-subtle: rgba(255, 255, 255, 0.04);
+
+    /* Text scale */
+    --nxt-text:    #FAFAFA;
+    --nxt-text-2:  #B4B4BE;
+    --nxt-text-3:  #6E6E78;
+    --nxt-text-4:  #4A4A52;
+
+    /* Premium glow accents — cool blue / cyan primary, amber secondary */
+    --nxt-accent:       #5EEAD4;   /* cyan-mint primary */
+    --nxt-accent-2:     #6366F1;   /* indigo for gradient pair */
+    --nxt-accent-warm:  #F59E0B;   /* amber for energy moments */
+    --nxt-accent-pink:  #EC4899;   /* pink for live/active glow */
+
+    --nxt-glow:         rgba(94, 234, 212, 0.45);
+    --nxt-glow-soft:    rgba(94, 234, 212, 0.18);
+    --nxt-glow-warm:    rgba(245, 158, 11, 0.32);
+
+    /* Semantic */
+    --nxt-success: #34D399;
+    --nxt-warning: #FBBF24;
+    --nxt-error:   #FB7185;
+    --nxt-info:    #60A5FA;
+
+    /* ---------- Theme-aware tokens (Phase 8 minimal workspace) ----------
+       New components reference these instead of hard-coded graphite hex so
+       the same code re-skins under light mode. Default values mirror the
+       carbon graphite system. Light mode overrides land in
+       `[data-theme="light"]` below. */
+    --nxt-fg:           #FAFAFA;
+    --nxt-fg-dim:       rgba(255, 255, 255, 0.66);
+    --nxt-fg-faint:     rgba(255, 255, 255, 0.42);
+    --nxt-surface:      rgba(48, 48, 56, 0.55);
+    --nxt-surface-soft: rgba(255, 255, 255, 0.025);
+    --nxt-border:       rgba(255, 255, 255, 0.07);
+    --nxt-border-soft:  rgba(255, 255, 255, 0.05);
+    --nxt-chip-bg:      rgba(255, 255, 255, 0.03);
+    --nxt-chip-border:  rgba(255, 255, 255, 0.08);
+    --nxt-accent-bg:     rgba(94, 234, 212, 0.10);
+    --nxt-accent-border: rgba(94, 234, 212, 0.22);
+    --nxt-avatar-bg:    linear-gradient(135deg, rgba(94, 234, 212, 0.18), rgba(48, 48, 56, 0.6));
+    --nxt-tabbar:       rgba(36, 36, 40, 0.92);
+    --nxt-shadow-sm:    0 4px 14px -8px rgba(0, 0, 0, 0.45);
+    --nxt-shadow-lg:    0 22px 50px -22px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- Light mode (warm off-white / cream / tan) ---------- */
+[data-theme="light"] {
+    --nxt-bg:           #EFE9DA;            /* slightly deeper cream so panels read */
+    --nxt-bg-2:         #E7E0CE;
+    --nxt-panel:        #FBF8EF;
+    --nxt-surface-2:    #FBF8EF;
+    --nxt-surface-3:    #F2EDDC;
+    --nxt-elevated:     #FFFFFF;
+
+    --nxt-text:    #1A1A1F;
+    --nxt-text-2:  #2B2B30;
+    --nxt-text-3:  #56524B;
+    --nxt-text-4:  #807B6E;
+
+    --nxt-fg:           #1A1A1F;
+    --nxt-fg-dim:       rgba(26, 26, 31, 0.72);
+    --nxt-fg-faint:     rgba(26, 26, 31, 0.52);
+    /* Surfaces — clearly lighter than --nxt-bg so cards/composers POP */
+    --nxt-surface:      #FBF8EF;
+    --nxt-surface-soft: #F7F2E2;
+    --nxt-border:       rgba(26, 26, 31, 0.14);
+    --nxt-border-soft:  rgba(26, 26, 31, 0.09);
+    --nxt-border-strong: rgba(26, 26, 31, 0.18);
+    --nxt-chip-bg:      #F2EDDC;
+    --nxt-chip-border:  rgba(26, 26, 31, 0.10);
+    --nxt-accent-bg:     rgba(20, 130, 110, 0.13);
+    --nxt-accent-border: rgba(20, 130, 110, 0.32);
+    --nxt-avatar-bg:    linear-gradient(135deg, rgba(20, 130, 110, 0.24), #F2EDDC);
+    --nxt-tabbar:       rgba(251, 248, 239, 0.95);
+    --nxt-shadow-sm:    0 4px 14px -8px rgba(60, 50, 30, 0.18);
+    --nxt-shadow-lg:    0 22px 50px -22px rgba(60, 50, 30, 0.22);
+
+    /* Slightly deepen the accent on warm light surfaces for contrast */
+    --nxt-accent:       #14826E;
+    --nxt-glow:         rgba(20, 130, 110, 0.32);
+    --nxt-glow-soft:    rgba(20, 130, 110, 0.14);
+
+    color-scheme: light;
+}
+
+@layer base {
+    :root {
+        /* Carbon graphite HSL — derived from the spec hex palette.
+           No pure black anywhere. */
+        --background: 240 5% 18%;       /* #2B2B31 base */
+        --foreground: 0 0% 98%;
+        --card: 240 5% 20%;             /* #303038 raised */
+        --card-foreground: 0 0% 98%;
+        --popover: 240 6% 17%;          /* #2A2A2F */
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 100%;
+        --primary-foreground: 240 6% 14%;
+        --secondary: 240 5% 16%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 240 6% 14%;            /* #242428 */
+        --muted-foreground: 240 4% 65%;
+        --accent: 173 80% 60%;
+        --accent-foreground: 240 6% 14%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 4% 22%;
+        --input: 240 4% 22%;
+        --ring: 173 80% 60%;
+        --radius: 0.5rem;
+    }
+    * { @apply border-border; }
+    html, body, #root { height: 100%; }
+    body {
+        margin: 0;
+        background: var(--nxt-bg);
+        color: var(--nxt-text);
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-feature-settings: "ss01", "cv11", "cv02";
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+    h1, h2, h3, h4 {
+        font-family: 'Cabinet Grotesk', 'Inter', sans-serif;
+        letter-spacing: -0.025em;
+        font-weight: 700;
+    }
+    code, pre, .mono {
+        font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+        font-feature-settings: "liga" 0;
+    }
+}
+
+/* =====================================================================
+   Scrollbars — minimal, monochrome
+   ===================================================================== */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+
+::selection { background: rgba(94, 234, 212, 0.28); color: #fff; }
+
+/* =====================================================================
+   Surface helpers
+   ===================================================================== */
+.nxt-panel {
+    background: var(--nxt-panel);
+    border: 1px solid var(--nxt-border);
+    border-radius: 12px;
+}
+.nxt-surface {
+    background: var(--nxt-surface);
+    border: 1px solid var(--nxt-border);
+    border-radius: 14px;
+}
+.nxt-surface-2 {
+    background: var(--nxt-surface-2);
+    border: 1px solid var(--nxt-border);
+    border-radius: 14px;
+}
+.nxt-glass {
+    background: rgba(36, 36, 40, 0.72);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--nxt-border-strong);
+}
+
+/* Premium card — frosted graphite + subtle inner highlight + soft outer glow */
+.nxt-card-premium {
+    position: relative;
+    background: linear-gradient(180deg,
+        rgba(48, 48, 56, 0.62) 0%,
+        rgba(36, 36, 40, 0.55) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    backdrop-filter: blur(24px);
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.4s ease;
+}
+.nxt-card-premium::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(180deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        transparent 50%);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+.nxt-card-premium:hover {
+    border-color: rgba(94, 234, 212, 0.20);
+    box-shadow: 0 24px 60px -24px rgba(94, 234, 212, 0.18),
+                0 0 0 1px rgba(94, 234, 212, 0.10);
+}
+
+/* =====================================================================
+   Premium glow rings — used for active model cards, live deploy indicators, etc.
+   ===================================================================== */
+.nxt-glow-ring {
+    position: relative;
+    box-shadow:
+        0 0 0 1px rgba(94, 234, 212, 0.30),
+        0 0 32px -6px rgba(94, 234, 212, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.nxt-glow-ring-warm {
+    box-shadow:
+        0 0 0 1px rgba(245, 158, 11, 0.30),
+        0 0 32px -6px rgba(245, 158, 11, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.nxt-glow-text {
+    background: linear-gradient(180deg, #FFFFFF 0%, #B4F0E6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 28px rgba(94, 234, 212, 0.18);
+}
+.nxt-glow-text-warm {
+    background: linear-gradient(180deg, #FFFFFF 0%, #FBD38D 80%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* =====================================================================
+   Gradient orbs — ambient cinematic backdrop (replaces patterned bg)
+   ===================================================================== */
+.nxt-orb {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(80px);
+    pointer-events: none;
+    opacity: 0.45;
+    will-change: transform, opacity;
+}
+.nxt-orb-cyan {
+    background: radial-gradient(closest-side, #5EEAD4 0%, rgba(94, 234, 212, 0) 70%);
+}
+.nxt-orb-indigo {
+    background: radial-gradient(closest-side, #6366F1 0%, rgba(99, 102, 241, 0) 70%);
+}
+.nxt-orb-amber {
+    background: radial-gradient(closest-side, #F59E0B 0%, rgba(245, 158, 11, 0) 70%);
+}
+.nxt-orb-pink {
+    background: radial-gradient(closest-side, #EC4899 0%, rgba(236, 72, 153, 0) 70%);
+}
+
+/* =====================================================================
+   Mono overline — small uppercase technical labels
+   ===================================================================== */
+.nxt-overline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--nxt-text-3);
+    font-weight: 500;
+}
+
+/* =====================================================================
+   Buttons — three tiers (primary glow, ghost glass, subtle outline)
+   ===================================================================== */
+.nxt-btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 ease-out;
+    border-radius: 10px;
+    border: 1px solid var(--nxt-border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--nxt-text);
+}
+.nxt-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--nxt-border-strong);
+    transform: translateY(-1px);
+}
+.nxt-btn:active { transform: translateY(0); }
+
+.nxt-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-out;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #FAFAFA 0%, #DADADA 100%);
+    color: #0A0A0F;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 6px 20px -6px rgba(255, 255, 255, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+.nxt-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px -6px rgba(255, 255, 255, 0.22),
+                inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+.nxt-btn-primary:disabled {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--nxt-text-3);
+    border-color: var(--nxt-border);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.nxt-btn-glow {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-out;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #5EEAD4 0%, #6366F1 100%);
+    color: #050507;
+    border: 1px solid rgba(94, 234, 212, 0.40);
+    box-shadow: 0 6px 24px -6px rgba(94, 234, 212, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.30);
+}
+.nxt-btn-glow:hover {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 12px 36px -6px rgba(94, 234, 212, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.40);
+}
+
+.nxt-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-out;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+}
+.nxt-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
+}
+
+/* =====================================================================
+   Inputs — premium pill style
+   ===================================================================== */
+.nxt-input {
+    @apply w-full px-3.5 py-2.5 text-sm outline-none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--nxt-border);
+    color: var(--nxt-text);
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.nxt-input::placeholder { color: var(--nxt-text-3); }
+.nxt-input:focus {
+    border-color: rgba(94, 234, 212, 0.40);
+    box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+}
+.nxt-auth-input {
+    @apply w-full px-4 outline-none;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(48,48,56,0.55) 0%, rgba(36,36,40,0.50) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 16px; /* prevents iOS zoom */
+    line-height: 1;
+    letter-spacing: -0.005em;
+    transition: border-color 200ms cubic-bezier(0.16,1,0.3,1),
+                box-shadow 200ms cubic-bezier(0.16,1,0.3,1),
+                background 200ms cubic-bezier(0.16,1,0.3,1);
+    font-family: inherit;
+}
+.nxt-auth-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+.nxt-auth-input:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+.nxt-auth-input:focus,
+.nxt-auth-input:focus-visible {
+    border-color: rgba(94, 234, 212, 0.45);
+    box-shadow:
+        0 0 0 4px rgba(94, 234, 212, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(52,52,60,0.65) 0%, rgba(40,40,44,0.55) 100%);
+}
+
+/* =====================================================================
+   Status pulse — used for CONNECTED dot, LIVE indicators, etc.
+   ===================================================================== */
+@keyframes nxt-pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.55); opacity: 1; }
+    50%      { box-shadow: 0 0 0 10px rgba(94, 234, 212, 0); opacity: 0.85; }
+}
+.nxt-pulse { animation: nxt-pulse-glow 2.2s ease-out infinite; }
+
+@keyframes nxt-pulse-warm {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); opacity: 1; }
+    50%      { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); opacity: 0.85; }
+}
+.nxt-pulse-warm { animation: nxt-pulse-warm 2.2s ease-out infinite; }
+
+@keyframes nxt-pulse-pink {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.55); opacity: 1; }
+    50%      { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); opacity: 0.85; }
+}
+.nxt-pulse-pink { animation: nxt-pulse-pink 2.2s ease-out infinite; }
+
+/* Cursor blink (used in chat streaming) */
+@keyframes nxt-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.nxt-cursor::after {
+    content: "▍";
+    margin-left: 2px;
+    animation: nxt-blink 1s steps(2) infinite;
+    color: var(--nxt-accent);
+}
+
+/* Fade-in-up entrance */
+@keyframes nxt-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.nxt-fade-up { animation: nxt-fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Scanline sweep — used on cards during stream */
+@keyframes nxt-scan {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.nxt-scan { position: relative; overflow: hidden; }
+.nxt-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(94, 234, 212, 0.12) 50%,
+        transparent 100%);
+    animation: nxt-scan 3s ease-in-out infinite;
+}
+
+/* Project card — graphite panel with hover lift + cyan sweep glow */
+.nxt-project-card {
+    position: relative;
+    background: linear-gradient(180deg, var(--nxt-surface) 0%, var(--nxt-bg-2) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.4s ease;
+    overflow: hidden;
+}
+.nxt-project-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 60%);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+}
+.nxt-project-card::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 17px;
+    background: radial-gradient(80% 80% at 50% 0%, rgba(94, 234, 212, 0.20) 0%, rgba(94, 234, 212, 0) 60%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+.nxt-project-card:hover {
+    border-color: rgba(94, 234, 212, 0.18);
+    transform: translateY(-2px);
+    box-shadow:
+        0 20px 50px -22px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(94, 234, 212, 0.08);
+}
+.nxt-project-card:hover::after { opacity: 1; }
+
+/* Mobile-first chat composer breakpoint helper */
+@media (max-width: 640px) {
+    .nxt-mobile-composer {
+        padding-bottom: max(env(safe-area-inset-bottom, 0), 12px);
+    }
+    .nxt-mobile-composer textarea {
+        min-height: 48px;
+        font-size: 15px;
+        line-height: 1.45;
+    }
+    .nxt-mobile-bubble {
+        max-width: 92% !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+}
+
+/* Slow orb drift for the backdrop */
+@keyframes nxt-orb-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(40px, -30px) scale(1.08); }
+}
+.nxt-orb-drift { animation: nxt-orb-drift 18s ease-in-out infinite; }
+
+@keyframes nxt-orb-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-30px, 40px) scale(0.92); }
+}
+.nxt-orb-drift-2 { animation: nxt-orb-drift-2 22s ease-in-out infinite; }
+
+/* Shimmer for skeletons / loading bars */
+@keyframes nxt-shimmer {
+    0%   { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+.nxt-shimmer {
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.03) 0%,
+        rgba(255,255,255,0.08) 50%,
+        rgba(255,255,255,0.03) 100%);
+    background-size: 2000px 100%;
+    animation: nxt-shimmer 2.4s linear infinite;
+}
+
+/* =====================================================================
+   Mobile safe areas
+   ===================================================================== */
+.nxt-safe-top    { padding-top: env(safe-area-inset-top, 0); }
+.nxt-safe-bottom { padding-bottom: max(env(safe-area-inset-bottom, 0), 14px); }
+
+/* Slide-up sheet entrance */
+@keyframes nxtSlideUpFs {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+.nxt-slide-up { animation: nxtSlideUpFs 280ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes nxtSlideInRight {
+    from { transform: translateX(28px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+.nxt-slide-in-right { animation: nxtSlideInRight 260ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Code block (used in builder file panel etc.) */
+.nxt-code {
+    background: rgba(31, 31, 35, 0.92);
+    color: #F8F8F2;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 16px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--nxt-border);
+}
+.nxt-code .tok-key { color: #F472B6; }
+.nxt-code .tok-str { color: #FBBF24; }
+.nxt-code .tok-fn  { color: #60A5FA; }
+.nxt-code .tok-com { color: #6B7280; font-style: italic; }
+
+/* Hide scrollbars (used by tab strips, model picker carousels) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* =====================================================================
+   GLOBAL FOCUS / TAP HIGHLIGHT — kill all native blue, replace with
+   soft graphite/teal ambient edge. NO browser-default outlines anywhere.
+   ===================================================================== */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+/* Universal kill — every variant of native focus chrome AND tap highlights
+   that browsers paint blue by default (Chrome focus ring, Android tap-tint,
+   iOS Safari tint). NXT1 only uses on-brand graphite/jade affordances; we
+   never want a native blue glow anywhere in the app. */
+*,
+*::before,
+*::after {
+    -webkit-tap-highlight-color: transparent;
+}
+*:focus,
+*:focus-visible,
+*:focus-within {
+    outline: none !important;
+    outline-offset: 0 !important;
+    -webkit-appearance: none;
+}
+/* Strip the user-agent invalid/valid pseudo glows that some browsers paint blue */
+input:invalid,
+textarea:invalid,
+select:invalid {
+    box-shadow: none;
+}
+
+/* Explicitly clobber the user-agent blue on form controls */
+input,
+textarea,
+select,
+button {
+    outline: none !important;
+
+/* SHADCN focus-ring kill — Tailwind's `focus-visible:ring-*` utilities paint
+   a semi-transparent halo that often reads as blue against the graphite UI.
+   We override the `--ring` source variable + box-shadow utilities so any
+   shadcn primitive (Button/Input/Select/Checkbox/Switch/Slider/etc) shows
+   a soft jade glow instead, and never the native browser blue. */
+.ring-ring,
+.focus-visible\:ring-ring:focus-visible,
+.focus\:ring-ring:focus,
+[class*="ring-ring"],
+[class*="focus-visible:ring"]:focus-visible,
+[class*="focus:ring"]:focus {
+    --tw-ring-color: rgba(94, 234, 212, 0.45) !important;
+    --tw-ring-offset-color: transparent !important;
+    --tw-ring-shadow: 0 0 0 var(--tw-ring-offset-width, 0px) var(--tw-ring-offset-color), 0 0 0 calc(var(--tw-ring-offset-width, 0px) + var(--tw-ring-width, 1px)) var(--tw-ring-color) !important;
+    box-shadow: var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000) !important;
+}
+html[data-theme="light"] .ring-ring,
+html[data-theme="light"] [class*="focus-visible:ring"]:focus-visible,
+html[data-theme="light"] [class*="focus:ring"]:focus {
+    --tw-ring-color: rgba(20, 130, 110, 0.42) !important;
+}
+
+    -webkit-appearance: none;
+    appearance: none;
+}
+input:focus,
+textarea:focus,
+select:focus,
+button:focus,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+    outline: none !important;
+    box-shadow: none;
+}
+
+/* Opt-in soft graphite glow — applied via .nxt-input / .nxt-auth-input / [&_input]:os-glow */
+.nxt-input:focus,
+.nxt-auth-input:focus,
+.nxt-input:focus-visible,
+.nxt-auth-input:focus-visible {
+    box-shadow:
+        0 0 0 1px rgba(94, 234, 212, 0.32),
+        0 0 0 4px rgba(94, 234, 212, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-color: rgba(94, 234, 212, 0.42);
+}
+
+/* Opt-in stronger teal ring for hero/primary elements that need emphasis */
+.os-focus-ring:focus-visible {
+    box-shadow:
+        0 0 0 1px rgba(94, 234, 212, 0.45),
+        0 0 0 5px rgba(94, 234, 212, 0.12) !important;
+}
+
+/* Safari autofill — kill the yellow + blue ring artifact */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+    -webkit-text-fill-color: #FAFAFA;
+    -webkit-box-shadow: 0 0 0 1000px rgba(36, 36, 40, 0.95) inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+    caret-color: rgba(94, 234, 212, 0.9);
+}
+
+::selection      { background: rgba(94, 234, 212, 0.28); color: #FFFFFF; }
+::-moz-selection { background: rgba(94, 234, 212, 0.28); color: #FFFFFF; }
+
+/* iOS Safari: prevent zoom-on-focus by ensuring inputs render >= 16px on mobile */
+@media (max-width: 640px) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+}
+
+/* =====================================================================
+   UNIFIED GRAPHITE MATERIAL SYSTEM — Phase 16
+   The operating-system surface language for every authenticated screen.
+   No pure black anywhere. Everything is matte carbon graphite.
+   ===================================================================== */
+
+/* Motion tokens — Linear / Raycast / Arc */
+:root {
+    --os-ease:        cubic-bezier(0.16, 1, 0.3, 1);
+    --os-ease-snap:   cubic-bezier(0.4, 0, 0.2, 1);
+    --os-d-fast:      150ms;
+    --os-d-base:      220ms;
+    --os-d-slow:      320ms;
+
+    /* Layered graphite surfaces (smoked-metal scale) */
+    --surface-0:      #2B2B31;
+    --surface-1:      #242428;
+    --surface-2:      #303038;
+    --surface-3:      #34343C;
+    --surface-4:      #3A3A42;
+    --surface-recessed: #1F1F23;
+
+    /* Graphite scrims (replace bg-black/X) — never pure black */
+    --scrim-soft:     rgba(20, 20, 24, 0.55);
+    --scrim:          rgba(20, 20, 24, 0.72);
+    --scrim-strong:   rgba(20, 20, 24, 0.85);
+
+    /* Hairlines (subtle separators, not heavy borders) */
+    --hairline:       rgba(255, 255, 255, 0.05);
+    --hairline-strong: rgba(255, 255, 255, 0.08);
+
+    /* Elevation recipes */
+    --elev-1:         0 4px 14px -6px rgba(0, 0, 0, 0.45),
+                      0 0 0 1px rgba(255, 255, 255, 0.04);
+    --elev-2:         0 14px 36px -14px rgba(0, 0, 0, 0.60),
+                      0 0 0 1px rgba(255, 255, 255, 0.05);
+    --elev-3:         0 30px 80px -20px rgba(0, 0, 0, 0.70),
+                      0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Light-mode surface overrides — warm cream scale so `.surface-0`,
+   `.surface-1`, `.surface-recessed` and friends become theme-aware
+   without having to rewrite every component class. These are the
+   exact paper-tones used by Workspace home / Landing, so the Builder
+   inherits the same warm palette automatically. */
+[data-theme="light"] {
+    --surface-0:        #FBF8EF;   /* paper — app body */
+    --surface-1:        #F4EEDD;   /* card / composer surface */
+    --surface-2:        #ECE4CE;
+    --surface-3:        #E0D6BA;
+    --surface-4:        #D2C6A4;
+    --surface-recessed: #F7F2E2;   /* chat scroll well — slightly softer than 0 */
+
+    --scrim-soft:       rgba(40, 32, 18, 0.18);
+    --scrim:            rgba(40, 32, 18, 0.36);
+    --scrim-strong:     rgba(40, 32, 18, 0.58);
+
+    --hairline:         rgba(26, 26, 31, 0.08);
+    --hairline-strong:  rgba(26, 26, 31, 0.14);
+
+    --elev-1:           0 4px 14px -8px rgba(60, 50, 30, 0.18),
+                        0 0 0 1px rgba(26, 26, 31, 0.06);
+    --elev-2:           0 14px 36px -16px rgba(60, 50, 30, 0.22),
+                        0 0 0 1px rgba(26, 26, 31, 0.07);
+    --elev-3:           0 30px 80px -24px rgba(60, 50, 30, 0.28),
+                        0 0 0 1px rgba(26, 26, 31, 0.08);
+}
+
+/* Base body — explicit graphite (never bg-black) */
+body { background: var(--surface-0); }
+
+/* Layered surface utilities */
+@layer components {
+.surface-0 { background: var(--surface-0); }
+.surface-1 { background: var(--surface-1); }
+.surface-2 { background: var(--surface-2); }
+.surface-3 { background: var(--surface-3); }
+.surface-4 { background: var(--surface-4); }
+.surface-recessed { background: var(--surface-recessed); }
+
+/* Graphite scrims — replace every bg-black/X modal/overlay scrim */
+.scrim       { background: var(--scrim);        backdrop-filter: blur(8px);  -webkit-backdrop-filter: blur(8px); }
+.scrim-soft  { background: var(--scrim-soft);   backdrop-filter: blur(6px);  -webkit-backdrop-filter: blur(6px); }
+.scrim-strong{ background: var(--scrim-strong); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+/* Hairlines (use in place of border for separators) */
+.hairline       { border-color: var(--hairline) !important; }
+.hairline-strong{ border-color: var(--hairline-strong) !important; }
+.hairline-y > * + * { border-top: 1px solid var(--hairline); }
+
+/* Glass panels (graphite-tinted, never charcoal-black) */
+.glass-1 {
+    background: linear-gradient(180deg, rgba(48,48,56,0.55) 0%, rgba(36,36,40,0.60) 100%);
+    border: 1px solid var(--hairline-strong);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.glass-2 {
+    background: linear-gradient(180deg, rgba(52,52,60,0.78) 0%, rgba(36,36,40,0.78) 100%);
+    border: 1px solid var(--hairline-strong);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+.glass-rail {
+    /* Floating left-rail — no visible border, just elevation + blur */
+    background: linear-gradient(180deg, rgba(48,48,56,0.55) 0%, rgba(31,31,35,0.55) 100%);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 24px 60px -20px rgba(0,0,0,0.6);
+}
+
+/* Glow-hover — subtle graphite radial glow on hover (project cards, tiles) */
+.glow-hover {
+    position: relative;
+    transition: transform var(--os-d-base) var(--os-ease),
+                box-shadow var(--os-d-slow) var(--os-ease);
+}
+.glow-hover::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: radial-gradient(70% 80% at 50% 110%,
+        rgba(255, 255, 255, 0.10) 0%,
+        rgba(94, 234, 212, 0.08) 30%,
+        rgba(94, 234, 212, 0) 65%);
+    opacity: 0;
+    transition: opacity var(--os-d-slow) var(--os-ease);
+    pointer-events: none;
+}
+.glow-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--elev-2);
+}
+.glow-hover:hover::after { opacity: 1; }
+
+/* Rail button — minimal icon-only nav button */
+.rail-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: rgba(255,255,255,0.55);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: color var(--os-d-fast) var(--os-ease),
+                background var(--os-d-fast) var(--os-ease),
+                transform var(--os-d-fast) var(--os-ease);
+}
+.rail-btn:hover {
+    color: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.04);
+}
+.rail-btn[data-active="true"] {
+    color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08),
+                0 8px 24px -10px rgba(94,234,212,0.18);
+}
+.rail-btn[data-active="true"]::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 18px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #5EEAD4 0%, #6366F1 100%);
+}
+
+/* Os-pill — quiet rounded chip with hover */
+.os-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    color: rgba(255,255,255,0.62);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--os-d-fast) var(--os-ease),
+                background var(--os-d-fast) var(--os-ease),
+                border-color var(--os-d-fast) var(--os-ease);
+}
+.os-pill:hover { color: rgba(255,255,255,0.92); background: rgba(255,255,255,0.04); }
+.os-pill[data-active="true"] {
+    color: #fff;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.10);
+}
+
+/* Peek panel (right-side contextual sheet — only visible when invoked) */
+.peek-panel {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(440px, 100vw);
+    z-index: 60;
+    background: linear-gradient(180deg, rgba(48,48,56,0.92) 0%, rgba(36,36,40,0.95) 100%);
+    border-left: 1px solid var(--hairline-strong);
+    backdrop-filter: blur(32px) saturate(150%);
+    -webkit-backdrop-filter: blur(32px) saturate(150%);
+    box-shadow: -30px 0 80px -20px rgba(0,0,0,0.55);
+    transform: translateX(100%);
+    transition: transform var(--os-d-slow) var(--os-ease);
+}
+.peek-panel[data-open="true"] { transform: translateX(0); }
+
+/* Backwards-compat graphite scrim used in many legacy modals */
+.bg-graphite-scrim { background: var(--scrim); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.bg-graphite-scrim-soft { background: var(--scrim-soft); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.bg-graphite-scrim-strong { background: var(--scrim-strong); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+}
+
+/* Subtle ambient drift for the dashboard hero glow */
+@keyframes nxt-ambient-drift {
+    0%, 100% { transform: translate(0,0) scale(1); opacity: 0.55; }
+    50%      { transform: translate(20px,-14px) scale(1.06); opacity: 0.72; }
+}
+.nxt-ambient-drift { animation: nxt-ambient-drift 14s ease-in-out infinite; }
+
+/* Soft entrance for command-center stagger */
+@keyframes nxt-os-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.nxt-os-in { animation: nxt-os-in 480ms var(--os-ease) both; }
+.nxt-os-in-1 { animation-delay: 40ms; }
+.nxt-os-in-2 { animation-delay: 100ms; }
+.nxt-os-in-3 { animation-delay: 180ms; }
+.nxt-os-in-4 { animation-delay: 260ms; }
+
+
+/* =====================================================================
+   NXT1 — Sonner Toaster theming override (graphite dark / cream light)
+   Sonner v2's default rich-color variants render white success/error
+   bubbles which clash with the carbon graphite & warm cream system.
+   We force every variant to inherit the NXT1 surface tokens.
+   ===================================================================== */
+[data-sonner-toaster] {
+    --normal-bg:    #1F1F23 !important;
+    --normal-text:  #FAFAFA !important;
+    --normal-border: rgba(255, 255, 255, 0.08) !important;
+    --success-bg:   #1F1F23 !important;
+    --success-text: #FAFAFA !important;
+    --success-border: rgba(94, 234, 212, 0.32) !important;
+    --error-bg:     #1F1F23 !important;
+    --error-text:   #FAFAFA !important;
+    --error-border: rgba(251, 113, 133, 0.40) !important;
+    --info-bg:      #1F1F23 !important;
+    --info-text:    #FAFAFA !important;
+    --info-border:  rgba(96, 165, 250, 0.36) !important;
+    --warning-bg:   #1F1F23 !important;
+    --warning-text: #FAFAFA !important;
+    --warning-border: rgba(251, 191, 36, 0.40) !important;
+}
+[data-theme="light"] [data-sonner-toaster],
+html[data-theme="light"] [data-sonner-toaster] {
+    --normal-bg:    #FBF8EF !important;
+    --normal-text:  #1A1A1F !important;
+    --normal-border: rgba(26, 26, 31, 0.14) !important;
+    --success-bg:   #FBF8EF !important;
+    --success-text: #1A1A1F !important;
+    --success-border: rgba(20, 130, 110, 0.32) !important;
+    --error-bg:     #FBF8EF !important;
+    --error-text:   #1A1A1F !important;
+    --error-border: rgba(180, 60, 70, 0.36) !important;
+    --info-bg:      #FBF8EF !important;
+    --info-text:    #1A1A1F !important;
+    --info-border:  rgba(20, 90, 180, 0.32) !important;
+    --warning-bg:   #FBF8EF !important;
+    --warning-text: #1A1A1F !important;
+    --warning-border: rgba(180, 110, 20, 0.32) !important;
+}
+/* Apply on the actual toast bubbles regardless of type. */
+[data-sonner-toaster] [data-sonner-toast] {
+    background: var(--normal-bg) !important;
+    color: var(--normal-text) !important;
+    border: 1px solid var(--normal-border) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55) !important;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    font-family: 'IBM Plex Sans', 'Inter', sans-serif !important;
+}
+[data-theme="light"] [data-sonner-toaster] [data-sonner-toast] {
+    box-shadow: 0 18px 40px -18px rgba(60, 50, 30, 0.30) !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] {
+    background: var(--success-bg) !important;
+    color:      var(--success-text) !important;
+    border-color: var(--success-border) !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] {
+    background: var(--error-bg) !important;
+    color:      var(--error-text) !important;
+    border-color: var(--error-border) !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] {
+    background: var(--info-bg) !important;
+    color:      var(--info-text) !important;
+    border-color: var(--info-border) !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] {
+    background: var(--warning-bg) !important;
+    color:      var(--warning-text) !important;
+    border-color: var(--warning-border) !important;
+}
+/* Description text — slightly dimmer for the secondary line */
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
+    color: rgba(255, 255, 255, 0.62) !important;
+}
+[data-theme="light"] [data-sonner-toaster] [data-sonner-toast] [data-description] {
+    color: rgba(26, 26, 31, 0.62) !important;
+}
+/* Status icon — keep the type-color but make sure it reads on graphite */
+
+/* =====================================================================
+   NXT1 — Light Mode public-surface text overrides (Phase 11 W1)
+   The pre-Phase 10 landing/showcase components were authored against
+   dark mode and use white→gray gradient text fills that vanish on
+   warm cream. We ONLY remap those gradient headings here — text inside
+   intentional dark "device island" cards is left alone (it should stay
+   white on its dark surface).
+   ===================================================================== */
+/* Remap white→gray gradient headings on the cream body to a readable
+   graphite→tan gradient. Dark island cards have their own bg, so their
+   white text remains untouched. */
+html[data-theme="light"] [data-testid="landing-page"] h1 span[style*="linear-gradient(180deg, #E8E8EE"],
+html[data-theme="light"] [data-testid="landing-page"] h1 span[style*="linear-gradient(180deg, #FFFFFF"],
+html[data-theme="light"] [data-testid="landing-page"] h2 span[style*="linear-gradient(180deg, #E8E8EE"],
+html[data-theme="light"] [data-testid="landing-page"] h2 span[style*="linear-gradient(180deg, #FFFFFF"],
+html[data-theme="light"] [data-testid="landing-page"] h3 span[style*="linear-gradient(180deg, #E8E8EE"],
+html[data-theme="light"] [data-testid="landing-page"] h3 span[style*="linear-gradient(180deg, #FFFFFF"] {
+    background-image: linear-gradient(180deg, #1A1A1F 0%, #6A6259 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+/* Bare `text-white` on the landing body (sections that sit directly on
+   the cream backdrop, not inside dark cards). We use the immediate-text
+   class — NOT the deep descendant — so we don't touch text inside dark
+   surfaces. We mark dark surfaces via inline gradient + bg-graphite-* and
+   leave them alone. */
+html[data-theme="light"] [data-testid="landing-page"] > main > h1 .text-white,
+html[data-theme="light"] [data-testid="landing-page"] > main > h2 .text-white {
+    color: var(--nxt-fg) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] svg {
+    width: 16px;
+    height: 16px;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+    color: #5EEAD4 !important;
+}
+[data-theme="light"] [data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+    color: #14826E !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] {
+    color: #FB7185 !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] {
+    color: #FBBF24 !important;
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] {
+    color: #60A5FA !important;
+}
+
+
+/* =====================================================================
+   NXT1 — Tier badge light-mode contrast boost (Phase 11 W2)
+   On warm cream surfaces, the pastel tier accents (#5EEAD4, #F0D28A,
+   #A78BFA, #FB923C) wash out. Override with deeper hues + stronger
+   borders for readability while keeping the same hue family.
+   ===================================================================== */
+html[data-theme="light"] .nxt-tier-badge {
+    background: rgba(26, 26, 31, 0.04) !important;
+    border-color: rgba(26, 26, 31, 0.16) !important;
+    /* Darker, saturated text per tier — keep the meaning, regain contrast. */
+    color: var(--tier-color-dark, #1A1A1F) !important;
+}
+html[data-theme="light"] .nxt-tier-badge[style*="rgb(94, 234, 212)"],
+html[data-theme="light"] .nxt-tier-badge[style*="#5EEAD4"] {
+    --tier-color-dark: #0E8C73;
+}
+html[data-theme="light"] .nxt-tier-badge[style*="rgb(240, 210, 138)"],
+html[data-theme="light"] .nxt-tier-badge[style*="#F0D28A"] {
+    --tier-color-dark: #8B6914;
+}
+html[data-theme="light"] .nxt-tier-badge[style*="rgb(167, 139, 250)"],
+html[data-theme="light"] .nxt-tier-badge[style*="#A78BFA"] {
+    --tier-color-dark: #5B3FB8;
+}
+html[data-theme="light"] .nxt-tier-badge[style*="rgb(251, 146, 60)"],
+html[data-theme="light"] .nxt-tier-badge[style*="#FB923C"] {
+    --tier-color-dark: #B85D12;
+}
+/* Tier-icon color follows the same dark tier color in light mode. */
+html[data-theme="light"] .nxt-tier-badge svg {
+    color: var(--tier-color-dark, #1A1A1F) !important;
+}
+
+
+/* =====================================================================
+   NXT1 — LIGHT MODE composer + cockpit (per user direction, Phase 11 W3)
+   The dark "device island" composer + dark model-picker bottom-sheet
+   look jarring on warm cream. In light mode they should:
+     • match the page tan/cream surface
+     • show a thin dark outline (instead of dark fill)
+     • keep all child text/icons readable
+   Dark mode is untouched.
+   ===================================================================== */
+
+/* ----- LandingPage hero composer ----- */
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] > div:nth-child(2) {
+    background: var(--nxt-surface) !important;            /* warm cream */
+    border: 1px solid rgba(26, 26, 31, 0.18) !important;  /* clean dark outline */
+    box-shadow:
+        0 18px 36px -18px rgba(40, 30, 15, 0.20),
+        0 4px 12px -6px rgba(40, 30, 15, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-input"] {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-input"]::placeholder {
+    color: rgba(26, 26, 31, 0.40) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [role="tablist"] button[aria-selected="true"] {
+    background: linear-gradient(180deg, rgba(14, 140, 115, 0.10) 0%, rgba(14, 140, 115, 0.02) 100%) !important;
+    box-shadow: inset 0 0 0 1px rgba(14, 140, 115, 0.40), 0 6px 18px -10px rgba(14, 140, 115, 0.25) !important;
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [role="tablist"] button[aria-selected="true"] svg {
+    color: #0E8C73 !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [role="tablist"] button[aria-selected="false"] {
+    background: rgba(26, 26, 31, 0.025) !important;
+    box-shadow: inset 0 0 0 1px rgba(26, 26, 31, 0.10) !important;
+    color: rgba(26, 26, 31, 0.65) !important;
+}
+html[data-theme="light"] [data-testid="landing-build-button"] {
+    background: #1F1F23 !important;
+    color: #FAFAFA !important;
+    box-shadow: 0 10px 24px -10px rgba(31, 31, 35, 0.40),
+                0 4px 10px -4px rgba(31, 31, 35, 0.25) !important;
+}
+html[data-theme="light"] [data-testid="landing-build-button"]:hover {
+    background: #0E8C73 !important;
+}
+html[data-theme="light"] [data-testid="landing-build-button"]:disabled {
+    background: rgba(26, 26, 31, 0.08) !important;
+    color: rgba(26, 26, 31, 0.30) !important;
+    box-shadow: none !important;
+}
+
+/* ----- Model Picker Cockpit ----- */
+html[data-theme="light"] [data-testid="model-cockpit-trigger"] {
+    background: rgba(26, 26, 31, 0.04) !important;
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-trigger"]:hover {
+    background: rgba(26, 26, 31, 0.08) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-trigger"] .text-white,
+html[data-theme="light"] [data-testid="model-cockpit-trigger"] [class*="text-white\\/"] {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] > div {
+    background: var(--nxt-surface) !important;
+    border: 1px solid rgba(26, 26, 31, 0.18) !important;
+    box-shadow:
+        0 30px 60px -20px rgba(40, 30, 15, 0.30),
+        0 12px 28px -10px rgba(40, 30, 15, 0.18) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .bg-white\/15 {
+    background-color: rgba(26, 26, 31, 0.18) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/35,
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/45,
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/50,
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/60 {
+    color: rgba(26, 26, 31, 0.62) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white,
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/85,
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .text-white\/95 {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .bg-white\/\[0\.07\] {
+    background-color: rgba(26, 26, 31, 0.06) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .bg-white\/\[0\.04\],
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .hover\:bg-white\/\[0\.08\]:hover {
+    background-color: rgba(26, 26, 31, 0.04) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] .hover\:bg-white\/\[0\.03\]:hover {
+    background-color: rgba(26, 26, 31, 0.03) !important;
+}
+html[data-theme="light"] [data-testid="model-cockpit-panel"] [style*="rgba(94,234,212,0.18)"] {
+    background: rgba(14, 140, 115, 0.18) !important;
+    color: #0E8C73 !important;
+}
+
+/* ----- LIGHT MODE: Mode-tile icons + Claude badge inside the composer
+   The composer wrapper switched to cream, but the icons inside the mode
+   pills + the Claude provider badge still inherited `text-white` and
+   become invisible. Force them to graphite/jade so they show up. ----- */
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [role="tablist"] button[aria-selected="false"] svg {
+    color: rgba(26, 26, 31, 0.55) !important;
+}
+/* Provider badge ("CLAUDE" pill etc.) inside the composer action row.
+   The cockpit trigger uses inline rgba surface + var fg, but the inner
+   ProviderLogo and label inherit `text-white` from the parent. */
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [data-testid="model-cockpit-trigger"] {
+    background: rgba(26, 26, 31, 0.04) !important;
+    color: var(--nxt-fg) !important;
+    border-color: rgba(26, 26, 31, 0.12) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [data-testid="model-cockpit-trigger"] svg {
+    color: rgba(26, 26, 31, 0.78) !important;
+}
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] [data-testid="model-cockpit-trigger"] * {
+    color: var(--nxt-fg) !important;
+}
+/* Light-mode hint line under composer ("⌘ + ↵ to build"). */
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] + p,
+html[data-theme="light"] [data-testid="landing-prompt-cockpit"] ~ p {
+    color: rgba(26, 26, 31, 0.45) !important;
+}
+
+
+/* =========================================================================
+   LIGHT MODE — Builder page + Chat panel
+   The ChatPanel originally targeted dark only (text-white, border-white/5,
+   text-zinc-*, bg-white text-black send button). Rather than rewrite every
+   class, we scope-override the hardcoded utility classes inside the builder
+   surfaces so warm cream + soft graphite shines through.
+   ========================================================================= */
+
+html[data-theme="light"] [data-testid="builder-page"],
+html[data-theme="light"] [data-testid="chat-panel"] {
+    color: var(--nxt-fg);
+}
+
+/* Header & section hairlines — replace stark black/white with hairline tokens */
+html[data-theme="light"] [data-testid="builder-page"] .border-white\/5,
+html[data-theme="light"] [data-testid="chat-panel"] .border-white\/5 {
+    border-color: var(--hairline) !important;
+}
+html[data-theme="light"] [data-testid="builder-page"] .border-white\/10,
+html[data-theme="light"] [data-testid="chat-panel"] .border-white\/10 {
+    border-color: var(--hairline-strong) !important;
+}
+html[data-theme="light"] [data-testid="builder-page"] .border-white\/15,
+html[data-theme="light"] [data-testid="chat-panel"] .border-white\/15 {
+    border-color: var(--nxt-border) !important;
+}
+
+/* Hairline filler — the divider <span> in the mobile preview pill */
+html[data-theme="light"] [data-testid="builder-page"] .bg-white\/10,
+html[data-theme="light"] [data-testid="chat-panel"] .bg-white\/10 {
+    background-color: rgba(26, 26, 31, 0.10) !important;
+}
+html[data-theme="light"] [data-testid="builder-page"] .bg-white\/5,
+html[data-theme="light"] [data-testid="chat-panel"] .bg-white\/5 {
+    background-color: rgba(26, 26, 31, 0.05) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .bg-white\/\[0\.03\] {
+    background-color: rgba(26, 26, 31, 0.04) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .bg-white\/\[0\.04\],
+html[data-theme="light"] [data-testid="chat-panel"] .hover\:bg-white\/\[0\.04\]:hover {
+    background-color: rgba(26, 26, 31, 0.05) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .bg-white\/\[0\.07\] {
+    background-color: rgba(26, 26, 31, 0.07) !important;
+}
+
+/* Text — pull every text-white* / text-zinc* into graphite tokens */
+html[data-theme="light"] [data-testid="chat-panel"] .text-white,
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/85,
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/95,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-200 {
+    color: var(--nxt-fg) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/75,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-300,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-400 {
+    color: var(--nxt-fg-dim) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/40,
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/35,
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/45,
+html[data-theme="light"] [data-testid="chat-panel"] .text-white\/25,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-500,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-600,
+html[data-theme="light"] [data-testid="chat-panel"] .text-zinc-700,
+html[data-theme="light"] [data-testid="chat-panel"] .placeholder\:text-zinc-500::placeholder {
+    color: var(--nxt-fg-faint) !important;
+}
+
+/* The hero gradient ("Tell NXT1 what to build.") — was a silver→smoke
+   gradient sitting on graphite. On cream, the silver vanishes. Convert
+   to a graphite→tan gradient instead. */
+html[data-theme="light"] [data-testid="chat-panel"] h2 span[style*="linear-gradient(180deg, #E8E8EE"] {
+    background: linear-gradient(180deg, #1A1A1F 0%, #6E6452 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+/* Suggestion rows + tool receipts borders */
+html[data-theme="light"] [data-testid="chat-panel"] [class*="border-emerald-400\/"] {
+    border-color: rgba(20, 130, 110, 0.32) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] [class*="bg-emerald-500\/"],
+html[data-theme="light"] [data-testid="chat-panel"] [class*="bg-emerald-400\/"] {
+    background-color: rgba(20, 130, 110, 0.08) !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .text-emerald-200,
+html[data-theme="light"] [data-testid="chat-panel"] .text-emerald-300 {
+    color: #0E6A55 !important;
+}
+html[data-theme="light"] [data-testid="chat-panel"] .text-emerald-400\/70,
+html[data-theme="light"] [data-testid="chat-panel"] .text-emerald-400\/60,
+html[data-theme="light"] [data-testid="chat-panel"] .text-emerald-400\/80 {
+    color: rgba(14, 106, 85, 0.78) !important;
+}
+
+/* BuildSummaryCard — the deep emerald-on-graphite gradient becomes a
+   warm cream paper card with a soft jade accent. */
+html[data-theme="light"] [data-testid="build-summary-card"] {
+    background: linear-gradient(180deg, #F5EFDC 0%, #FBF8EF 100%) !important;
+    border-color: rgba(20, 130, 110, 0.28) !important;
+    box-shadow: var(--nxt-shadow-sm);
+}
+
+/* Send / Stop button — keep call-to-action prominent in light mode by
+   inverting it (graphite chip with cream icon) so it doesn't get lost
+   on the cream composer. */
+html[data-theme="light"] [data-testid="chat-send-button"] {
+    background: var(--nxt-fg) !important;
+    color: var(--nxt-bg) !important;
+}
+html[data-theme="light"] [data-testid="chat-send-button"]:hover {
+    background: #2B2B30 !important;
+}
+html[data-theme="light"] [data-testid="chat-send-button"]:disabled {
+    background: rgba(26, 26, 31, 0.10) !important;
+    color: rgba(26, 26, 31, 0.32) !important;
+}
+html[data-theme="light"] [data-testid="chat-cancel-button"] {
+    background: var(--nxt-fg) !important;
+    color: var(--nxt-bg) !important;
+}
+html[data-theme="light"] [data-testid="chat-cancel-button"] > span {
+    background: var(--nxt-bg) !important;
+}
+
+/* Continue chip — was bg-white text-black; that's stark on cream. */
+html[data-theme="light"] [data-testid="chat-continue-button"] {
+    background: var(--nxt-fg) !important;
+    color: var(--nxt-bg) !important;
+}
+
+/* "Deploy Now" pill — emerald chip survives, but ensure text reads */
+html[data-theme="light"] [data-testid="chat-deploy-now-button"] {
+    background: var(--nxt-accent) !important;
+    color: #FBF8EF !important;
+}
+html[data-theme="light"] [data-testid="chat-deploy-now-button"]:hover {
+    background: #0E6A55 !important;
+}
+
+/* Status dot row at top of chat panel */
+html[data-theme="light"] [data-testid="chat-panel"] .bg-emerald-400 {
+    background-color: #14826E !important;
+}
+
+/* Desktop sticky preview rail border */
+html[data-theme="light"] [data-testid="builder-desktop-preview"] {
+    border-color: var(--hairline-strong) !important;
+}
+/* ──────────────────────────────────────────────────────────────────
+   Mobile responsiveness pass (Phase B.14, 2026-05-13)
+   - Prevent iOS auto-zoom on focused text inputs (font-size < 16px
+     triggers it on iPhone). We force 16px on focus for native fields
+     to keep designed typography intact at rest.
+   - Tighter outer padding on small screens so cards don't crowd the
+     viewport edges.
+   - Stop horizontal scroll caused by accidental wide children.
+   ────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    html, body {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+    /* Prevent iOS zoom on focus for ALL text-like inputs */
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="search"],
+    input[type="url"],
+    input[type="tel"],
+    input[type="number"],
+    textarea,
+    select {
+        font-size: 16px !important;
+    }
+    /* Make the tab bars inside AgentOS, AdminWorkspace etc. tap-friendly */
+    [data-testid="agentos-tabs"] button {
+        min-height: 44px;
+    }
+    /* Sticky-safe scrolling for tab bars */
+    [data-testid="agentos-tabs"],
+    nav[class*="overflow-x-auto"] {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        scroll-snap-type: x proximity;
+    }
+    [data-testid="agentos-tabs"]::-webkit-scrollbar,
+    nav[class*="overflow-x-auto"]::-webkit-scrollbar {
+        display: none;
+    }
+    /* Builder page: hide the desktop preview rail completely on phones
+       (already done via `hidden lg:flex` but be defensive against future
+       drift) */
+    [data-testid="builder-desktop-preview"] {
+        display: none !important;
+    }
+    /* Builder header height — keep tighter on phone */
+    [data-testid="builder-page"] header {
+        height: 44px;
+    }
+    /* AgentOS hero — trim excessive top padding on phones */
+    [data-testid="agentos-page"] {
+        padding-top: 18px !important;
+        padding-bottom: 24px !important;
+    }
+    /* AdminWorkspace pending pill — make visible on mobile (was hidden sm:inline-flex) */
+    [data-testid="admin-workspace"] header [class*="hidden sm:inline-flex"] {
+        display: inline-flex !important;
+        padding: 2px 8px !important;
+        font-size: 9.5px !important;
+    }
+}
+
+/* Larger tap targets for all link/button rows on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    button, [role="button"], a {
+        touch-action: manipulation;
+    }
+}

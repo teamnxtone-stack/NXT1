@@ -1,0 +1,60 @@
+/* App-level styles intentionally minimal — see index.css for tokens. */
+.app-root {
+    min-height: 100vh;
+}
+
+/* ---- Chat-first builder transitions ---- */
+@keyframes nxt-slide-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes nxt-slide-in-right {
+    from { transform: translateX(40px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes nxt-pop {
+    0%   { transform: scale(0.85); opacity: 0; }
+    60%  { transform: scale(1.04); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.nxt-slide-up {
+    animation: nxt-slide-up 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nxt-slide-in-right {
+    animation: nxt-slide-in-right 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nxt-pop {
+    animation: nxt-pop 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Floating action button — used by the chat-first builder for Preview/Deploy/Tools */
+.nxt-fab {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full text-sm font-semibold transition-all duration-200 ease-out shadow-lg;
+    background: rgba(10, 10, 10, 0.85);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(16px);
+}
+.nxt-fab:hover {
+    background: rgba(20, 20, 20, 0.95);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+}
+.nxt-fab-primary {
+    background: linear-gradient(135deg, #3ec5b9 0%, #ff8a3d 100%);
+    color: #0a0a0a;
+    border: none;
+    font-weight: 700;
+}
+.nxt-fab-primary:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 10px 32px -8px rgba(255, 138, 61, 0.4);
+}
+
+/* iOS safe-area aware bottom padding for floating chat input on mobile.
+   Adds at least 12px above the home indicator so the pill never feels
+   "stuck to the very bottom" of the screen. */
+.nxt-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 14px);
+}

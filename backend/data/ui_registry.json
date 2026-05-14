@@ -1,0 +1,234 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-01-15",
+  "description": "Curated premium UI component registry. The build agent retrieves entries from here so generated apps default to premium components (Magic UI / Aceternity / Origin UI / shadcn) instead of raw Tailwind. The AI is instructed to cite registry entries by id when scaffolding.",
+  "packs": [
+    {
+      "id": "shadcn",
+      "name": "shadcn/ui",
+      "homepage": "https://ui.shadcn.com",
+      "license": "MIT",
+      "install": "npx shadcn@latest add <component>",
+      "tagline": "Industry-standard composable primitives. Already installed in NXT1.",
+      "preferred_for": ["forms", "dialogs", "tables", "navigation", "data-display"]
+    },
+    {
+      "id": "magicui",
+      "name": "Magic UI",
+      "homepage": "https://magicui.design",
+      "license": "MIT",
+      "install": "npx shadcn@latest add 'https://magicui.design/r/<component>.json'",
+      "tagline": "Animated landing-page blocks — orbits, beams, marquees, sparkles, gradients.",
+      "preferred_for": ["hero", "landing", "marketing", "feature-showcase", "animation"]
+    },
+    {
+      "id": "aceternity",
+      "name": "Aceternity UI",
+      "homepage": "https://ui.aceternity.com",
+      "license": "MIT",
+      "install": "copy-paste from docs (uses framer-motion + tailwind)",
+      "tagline": "AI-startup aesthetics — spotlight cards, 3D pin, wavy bg, meteor effects.",
+      "preferred_for": ["hero", "feature-cards", "testimonials", "premium-cta", "ai-startup-vibe"]
+    },
+    {
+      "id": "originui",
+      "name": "Origin UI",
+      "homepage": "https://originui.com",
+      "license": "MIT",
+      "install": "copy-paste from docs",
+      "tagline": "Apple-style elegant primitives — premium inputs, sliders, polished form blocks.",
+      "preferred_for": ["forms", "settings", "auth", "preferences", "glassmorphism"]
+    },
+    {
+      "id": "framer-motion",
+      "name": "Framer Motion",
+      "homepage": "https://motion.dev",
+      "license": "MIT",
+      "install": "npm i framer-motion",
+      "tagline": "Industry-standard motion library. Already installed.",
+      "preferred_for": ["transitions", "stagger", "page-load", "spring-physics", "drag"]
+    },
+    {
+      "id": "r3f",
+      "name": "React Three Fiber",
+      "homepage": "https://r3f.docs.pmnd.rs",
+      "license": "MIT",
+      "install": "npm i three @react-three/fiber @react-three/drei",
+      "tagline": "3D in React — particles, globes, floating objects for hero sections.",
+      "preferred_for": ["3d-hero", "globe", "particles", "wow-factor"]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "hero.magicui.bento",
+      "pack": "magicui",
+      "kind": "hero",
+      "name": "Bento Grid Hero",
+      "summary": "Hero with animated bento grid and gradient backdrop.",
+      "deps": ["framer-motion", "tailwindcss"],
+      "ai_hint": "Use for SaaS / AI startup landing pages. Compose 6 bento cells with one large feature card and 5 smaller capability cards. Use a soft radial gradient on the backdrop and stagger entrance animations.",
+      "tags": ["landing", "saas", "ai", "hero"]
+    },
+    {
+      "id": "hero.aceternity.spotlight",
+      "pack": "aceternity",
+      "kind": "hero",
+      "name": "Spotlight Hero",
+      "summary": "Dark spotlight effect with a beam of light tracking the cursor.",
+      "deps": ["framer-motion", "tailwindcss"],
+      "ai_hint": "Use for product pages with a strong product photograph or 3D render. Headline 6-9 words, supporting line, single primary CTA. Keep it minimal.",
+      "tags": ["dark", "premium", "ai-startup"]
+    },
+    {
+      "id": "hero.aceternity.background-beams",
+      "pack": "aceternity",
+      "kind": "hero",
+      "name": "Background Beams",
+      "summary": "SVG-based animated light beams behind content.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Pair with a tight headline and a sharp CTA. Avoid more than 3 lines of body copy.",
+      "tags": ["dark", "abstract"]
+    },
+    {
+      "id": "card.magicui.shine-border",
+      "pack": "magicui",
+      "kind": "card",
+      "name": "Shine Border Card",
+      "summary": "Card with a slow rotating gradient border.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use for pricing tiers and feature cards. Limit to 3-4 per row.",
+      "tags": ["pricing", "feature"]
+    },
+    {
+      "id": "card.aceternity.3d-pin",
+      "pack": "aceternity",
+      "kind": "card",
+      "name": "3D Pin Card",
+      "summary": "Card tilts in 3D on hover with a perspective pin.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use sparingly for showcasing portfolio items or featured products.",
+      "tags": ["showcase", "portfolio"]
+    },
+    {
+      "id": "feature.magicui.marquee",
+      "pack": "magicui",
+      "kind": "feature",
+      "name": "Logo Marquee",
+      "summary": "Infinite scrolling row of logos with gradient mask edges.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use for social-proof rows. 6-12 logos, monochrome with reduced opacity.",
+      "tags": ["social-proof", "logos"]
+    },
+    {
+      "id": "feature.magicui.orbiting-circles",
+      "pack": "magicui",
+      "kind": "feature",
+      "name": "Orbiting Circles",
+      "summary": "Logos or icons orbiting around a central element.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use for integration showcases (`Connect to X, Y, Z`). Limit to 8 orbiting items max.",
+      "tags": ["integrations", "ecosystem"]
+    },
+    {
+      "id": "feature.aceternity.bento-grid",
+      "pack": "aceternity",
+      "kind": "feature",
+      "name": "Aceternity Bento",
+      "summary": "Bento grid with hover lift, color tinting and motion preview tiles.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use for the 'how it works' section. Mix sizes — 2 large + 4 small cells.",
+      "tags": ["features", "how-it-works"]
+    },
+    {
+      "id": "text.magicui.animated-gradient",
+      "pack": "magicui",
+      "kind": "text",
+      "name": "Animated Gradient Text",
+      "summary": "Heading text with an animated gradient sweeping across.",
+      "deps": [],
+      "ai_hint": "Apply only to ONE key word in the hero headline. Never the full headline.",
+      "tags": ["typography", "hero"]
+    },
+    {
+      "id": "text.magicui.typing-animation",
+      "pack": "magicui",
+      "kind": "text",
+      "name": "Typing Animation",
+      "summary": "Typewriter effect for hero or section headings.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use sparingly. Best for AI product demos showing live generation.",
+      "tags": ["ai", "demo"]
+    },
+    {
+      "id": "background.magicui.dot-pattern",
+      "pack": "magicui",
+      "kind": "background",
+      "name": "Dot Pattern",
+      "summary": "SVG dot grid with optional gradient mask.",
+      "deps": [],
+      "ai_hint": "Pair with subtle gradient on the page background. Avoid stacking with another pattern.",
+      "tags": ["background", "subtle"]
+    },
+    {
+      "id": "background.aceternity.wavy",
+      "pack": "aceternity",
+      "kind": "background",
+      "name": "Wavy Background",
+      "summary": "Animated SVG wave background with parallax.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Use for hero or section transitions. Keep contrast high above it.",
+      "tags": ["background", "wavy"]
+    },
+    {
+      "id": "background.aceternity.meteors",
+      "pack": "aceternity",
+      "kind": "background",
+      "name": "Meteor Shower",
+      "summary": "Falling-meteor lines streaking across dark backgrounds.",
+      "deps": ["framer-motion"],
+      "ai_hint": "Subtle and cinematic. Use only on dark themes. Keep meteor count under 20.",
+      "tags": ["background", "cinematic", "dark"]
+    },
+    {
+      "id": "input.originui.search-with-shortcut",
+      "pack": "originui",
+      "kind": "input",
+      "name": "Search Input with Shortcut",
+      "summary": "Search input with a trailing ⌘K shortcut chip.",
+      "deps": [],
+      "ai_hint": "Use for command-palette-style search bars. Pair with cmdk.",
+      "tags": ["search", "input"]
+    },
+    {
+      "id": "input.originui.password-strength",
+      "pack": "originui",
+      "kind": "input",
+      "name": "Password Input with Strength Meter",
+      "summary": "Password field with live strength feedback.",
+      "deps": [],
+      "ai_hint": "Use in signup/onboarding. Validate min 8 chars + variety.",
+      "tags": ["auth", "input"]
+    },
+    {
+      "id": "scene.r3f.particles",
+      "pack": "r3f",
+      "kind": "scene",
+      "name": "Particle Field",
+      "summary": "3D particle field reacting to scroll/cursor.",
+      "deps": ["three", "@react-three/fiber", "@react-three/drei"],
+      "ai_hint": "Reserve for the hero of high-end product pages. Keep particle count under 5000 for mobile perf.",
+      "tags": ["3d", "hero", "wow"]
+    },
+    {
+      "id": "scene.r3f.globe",
+      "pack": "r3f",
+      "kind": "scene",
+      "name": "Animated Globe",
+      "summary": "Spinning globe with arc connections between cities.",
+      "deps": ["three", "@react-three/fiber"],
+      "ai_hint": "Use for global products / network / distribution showcases.",
+      "tags": ["3d", "network", "global"]
+    }
+  ],
+  "generation_directive": "When the user asks for any landing page, hero section, feature grid, pricing block, or marketing page, the generator MUST select an appropriate block id from this registry and emit components that import from Magic UI / Aceternity (with framer-motion already available). Never emit a hero made of a raw `<div className=\"bg-gradient-to-br from-purple-500 to-pink-500\">`. Default to dark, premium, layered, animated. Cite the block id in code comments above each generated section so the editor can hot-swap blocks."
+}

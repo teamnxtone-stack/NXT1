@@ -1,0 +1,38 @@
+{
+  "id": "add-contact-form",
+  "title": "Add a contact form section without touching unrelated files",
+  "user_message": "Add a contact form section to the existing page with name, email, and message fields. Keep the existing hero. Do not touch package.json or configs.",
+  "starting_files": [
+    {
+      "path": "index.html",
+      "content": "<!doctype html><html><head><link rel='stylesheet' href='styles/main.css'></head><body><header class='hero'><h1>NXT1</h1></header><main id='main'></main></body></html>"
+    },
+    {
+      "path": "styles/main.css",
+      "content": "body{background:#0b0b0c;color:#eaeaea;font-family:system-ui}"
+    },
+    {
+      "path": "scripts/app.js",
+      "content": "// existing logic\nconsole.log('init');"
+    },
+    {
+      "path": "package.json",
+      "content": "{\"name\":\"nxt1-app\",\"private\":true}"
+    },
+    {
+      "path": "README.md",
+      "content": "# NXT1"
+    },
+    {
+      "path": "about.html",
+      "content": "<!doctype html><html><body><h1>About</h1></body></html>"
+    }
+  ],
+  "protocol": "tag",
+  "expected": {
+    "paths_present": ["index.html", "package.json"],
+    "keywords_in_any": ["contact", "name", "email", "message"],
+    "no_validation_errors": true,
+    "max_files_changed": 4
+  }
+}

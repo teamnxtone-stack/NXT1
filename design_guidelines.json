@@ -1,0 +1,143 @@
+{
+  "theme": "Dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) - Modified for Premium IDE",
+  "design_philosophy": "Objective, rigid, and functional. An 'AI Command Center' that feels sleek, futuristic, and highly capable, akin to premium dev tools like Cursor or Vercel v0. Prioritize stark minimalism, deep void backgrounds, and hyper-crisp typography over decorative gradients.",
+  "colors": {
+    "background": {
+      "page": "#050505",
+      "panel": "#0A0A0A",
+      "surface": "#121212",
+      "glass": "rgba(10, 10, 10, 0.7)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A",
+      "accent": "#F5F5F5"
+    },
+    "brand": {
+      "primary": "#FFFFFF",
+      "primary_foreground": "#000000",
+      "accent": "#0055FF",
+      "accent_foreground": "#FFFFFF",
+      "warning": "#FFB000",
+      "error": "#FF3B30",
+      "success": "#34C759"
+    },
+    "border": {
+      "default": "#1F1F22",
+      "focus": "#FFFFFF",
+      "subtle": "rgba(255, 255, 255, 0.05)"
+    },
+    "code_syntax": {
+      "background": "#0D0D0D",
+      "keyword": "#FF5C5C",
+      "string": "#FFC859",
+      "function": "#3B82F6",
+      "variable": "#F8F8F2",
+      "comment": "#6B7280"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "'Cabinet Grotesk', sans-serif",
+      "body": "'IBM Plex Sans', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl tracking-tight font-medium",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "body_sm": "text-sm leading-relaxed",
+      "code": "text-sm tracking-tight",
+      "overline": "text-xs uppercase tracking-[0.2em] font-semibold text-zinc-500"
+    },
+    "rules": [
+      "No generic sans-serif for headings (avoid Inter/Roboto).",
+      "Use extremely tight tracking for headings (tracking-tighter).",
+      "Use IBM Plex Sans for general dashboard body for a technical, crisp read.",
+      "Use JetBrains Mono for all code editors, file trees, and version snapshots."
+    ]
+  },
+  "spacing_and_layout": {
+    "system": "Tailwind standard, but highly intentional.",
+    "dashboard_grid": {
+      "type": "Bento Grid",
+      "classes": "grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8"
+    },
+    "ide_layout": {
+      "type": "Control Room Grid",
+      "structure": "Flex row or 3-col grid (w-64 explorer, flex-1 chat, w-[45%] preview) with h-screen constraints.",
+      "gap": "gap-4 or border-r separated"
+    },
+    "padding": {
+      "generous": "p-12 to p-24 (Login, Marketing, Dashboard Wrappers)",
+      "dense": "p-2 to p-4 (File explorer, IDE panels, Code blocks)"
+    }
+  },
+  "surfaces": {
+    "panels": "Flat backgrounds, 1px subtle border (border-white/10), no drop shadow. Use inner shadows sparingly.",
+    "glassmorphism": "backdrop-blur-2xl bg-black/60 border-b border-white/10 (For fixed IDE headers/navs).",
+    "buttons": "Square or very slightly rounded (rounded-sm). High contrast. Primary buttons are Stark White background with Black text.",
+    "radius": "0.25rem (rounded-sm) globally to maintain a rigid, technical structure."
+  },
+  "components_customization": {
+    "card": "Remove default white background. Use bg-[#0A0A0A] border border-[#1F1F22] rounded-sm.",
+    "input": "bg-[#050505] border-[#1F1F22] focus:border-white focus:ring-1 focus:ring-white rounded-sm text-sm.",
+    "dialog": "bg-[#0A0A0A] border border-[#1F1F22] rounded-sm backdrop-blur-3xl.",
+    "scrollbars": "Custom styled scrollbars, extremely thin (2px), `#333` thumb, `#050505` track. No gutters.",
+    "file_explorer": "Indent 12px per level, hover:bg-white/5, JetBrains Mono font, 14px size."
+  },
+  "motion": {
+    "hover_states": "Subtle background opacity shifts (e.g., hover:bg-white/10). Explicitly set text color.",
+    "transitions": "transition-all duration-200 ease-out",
+    "chat_streaming": "Staggered fade-in for AI messages, blinking block cursor `\u2588` for streaming effect.",
+    "accessibility": "respect prefers-reduced-motion"
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Minimal, sharp, consistent stroke width (1.5px).",
+    "usage": "Use icons for file types (js, css, html), play/deploy actions, folder toggles, and chat send buttons."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1761437855740-c894da924d79?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRhcmslMjBnZW9tZXRyaWMlMjBsaW5lcyUyMHRleHR1cmV8ZW58MHx8fHwxNzc4MjA3ODM5fDA&ixlib=rb-4.1.0&q=85",
+        "category": "login_background",
+        "description": "Abstract golden/metallic geometric lines on deep black. Use this as a dark, premium background for the NXT1 Password Gate screen with an overlay of bg-black/80 to ensure the login box pops."
+      }
+    ],
+    "rules": "No generic placeholders. Only use the provided Unsplash image for the login background."
+  },
+  "testing": {
+    "attributes": [
+      "data-testid=\"login-password-input\"",
+      "data-testid=\"login-submit-button\"",
+      "data-testid=\"project-create-tile\"",
+      "data-testid=\"project-card-{id}\"",
+      "data-testid=\"chat-input-textarea\"",
+      "data-testid=\"chat-send-button\"",
+      "data-testid=\"file-explorer-tree\"",
+      "data-testid=\"live-preview-iframe\"",
+      "data-testid=\"deploy-project-button\"",
+      "data-testid=\"download-project-button\"",
+      "data-testid=\"version-history-panel\""
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. APP CONTEXT: You are building NXT1, a premium, dark-mode-first AI builder IDE (akin to Cursor or Vercel v0). The entire application should feel like an elite command center.",
+    "2. ENTRY POINT (Password Gate): Build a sleek, centered login card over the abstract 'login_background' image. Use backdrop-blur and a heavy dark overlay on the background. Minimalist inputs.",
+    "3. PROJECT DASHBOARD: A grid layout of past projects. Include a 'Create New Project' tile with a subtle pulsing border (Tracing Beam concept) to draw attention.",
+    "4. WORKSPACE (The Core): Implement a 3-pane layout taking up the full viewport (h-screen, overflow-hidden):",
+    "   - Pane 1 (Left - w-64): File/Code Explorer and Version History accordion. Use JetBrains Mono here.",
+    "   - Pane 2 (Center - flex-1): AI Chat Builder. Chat bubbles shouldn't look like iMessage; they should look like terminal outputs or rich markdown blocks. Include a prominent chat input at the bottom.",
+    "   - Pane 3 (Right - flex-1 or w-[45%]): Live Preview Frame and Code Viewer. Switchable tabs. Code viewer must use syntax highlighting colors defined in JSON.",
+    "5. HEADER: A slim top bar (h-12) containing the 'NXT1' logo (Typography: Cabinet Grotesk, font-black, tracking-tighter). Right side: 'Deploy' button (with status dot) and 'Download ZIP' button.",
+    "6. COMPONENT STYLING: Strip away generic white-rounded cards. Everything must be bg-[#0A0A0A] or #050505, with sharp corners (rounded-sm) and stark white or dark grey borders.",
+    "7. CHAT EXPERIENCE: Make the chat feel alive. When AI is 'thinking/generating', show a smooth glowing line or typing cursor. Messages should be clearly separated by 1px borders, not floating bubbles.",
+    "8. OVERRIDE SHADCN: When installing shadcn components, immediately adjust their radii to `0.25rem` and adapt their backgrounds to the dark palette provided here.",
+    "9. DATA-TESTID: Ensure EVERY interactive element has the requested data-testid attribute for rigorous testing."
+  ]
+}

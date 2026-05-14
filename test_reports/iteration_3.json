@@ -1,0 +1,43 @@
+{
+  "summary": "Phase 21 polish-pass iteration 3 backend testing complete — 14/14 pytest cases passed. Validated all 4 polish items: (1) /api/ui-registry/implemented now returns count=17 + manifest path (.../backend/data/block_sources.json) + source_of_truth='frontend/src/components/ui/blocks/index.js BLOCK_MAP'. (2) /api/ui-registry/blocks/{id}/source emits Cache-Control: public, max-age=3600, immutable plus X-NXT1-Block-Id, X-NXT1-Block-File, X-NXT1-Named-Export headers — confirmed at the backend (localhost:8001). (3) /api/ui-registry/blocks/text.magicui.animated-gradient returns named_export='AnimatedGradientText' file='Primitives.jsx'; hero.aceternity.spotlight returns named_export=null file='SpotlightHero.jsx'. (4) services.workflow_service._has_entry(files) helper exists, handles None/empty/known/unknown paths, and is invoked by BOTH node_tester and reconcile_coder_phase (inspect.getsource verified). Workflow lifecycle: start → tester records has_entry=false on empty files; seed index.html + reconcile_coder_phase → tester_ok=true, deployer 'waiting' history entry, status='waiting'. Regression: /api/auth/login (pw=555), /api/ui-registry (6 packs, 17 blocks), /api/workflows/list, /api/hosting/readiness, /api/runner/config (mode=subprocess), /api/hosting/caddy/generate (HSTS) all 200.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/ui-registry/blocks/{id}/source",
+        "issue": "The Cache-Control: public, max-age=3600, immutable header is emitted correctly by the backend (verified via curl http://localhost:8001) but the K8s/Cloudflare ingress in front of the public preview URL OVERWRITES it to 'no-store, no-cache, must-revalidate'. The X-NXT1-* headers do pass through unchanged. So the polish-pass code is correct, but external clients hitting the preview URL will NOT see the immutable cache directive. Not a code bug, but if production CDN behavior matters, the ingress config (likely the standard Emergent preview Cloudflare cache rule) would need an exception for /api/ui-registry/blocks/*/source."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase21_polish.py",
+    "/app/test_reports/pytest/phase21_polish_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/ui_registry.py: _BLOCK_SOURCES is loaded once at import time from data/block_sources.json. If the JSON is regenerated while the backend is running, the manifest stays stale until restart. The docstring acknowledges this. Consider a /api/ui-registry/reload (admin-only) endpoint or check file mtime on each /implemented hit if hot-reload becomes a developer-experience pain.",
+    "services/workflow_service.py: the new _has_entry helper is good. However, the _ENTRY_PATHS set is hardcoded to 5 paths; for Next.js app-router projects pages.tsx variants like 'src/app/page.tsx' (note the 'src/' prefix) are missed. Consider matching by basename: any path whose last component is in {'main.tsx','main.jsx','main.js','page.tsx','page.jsx','index.html'} would be more robust.",
+    "scripts/sync_block_sources.js generates a manifest with field `named_export` but the route also writes an empty string ('') when named_export is None into the X-NXT1-Named-Export response header. Some HTTP clients treat empty header values as missing; consider omitting the header when there's no named export instead of sending an empty value.",
+    "reconcile_coder_phase still wraps everything in a broad try/except that swallows assertion-class bugs — flagged in iter2, still present. Lower priority since the helper extraction reduced duplication, but worth tightening when a related change lands.",
+    "The X-NXT1-Block-File header value comes straight from the manifest JSON; if the manifest were ever crafted with a path-traversal value the read in get_block_source would attempt to read outside _BLOCKS_DIR. The manifest is build-time generated so this is theoretical, but a `path.resolve().is_relative_to(_BLOCKS_DIR)` guard would be a one-liner of defence-in-depth."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase21_polish.py",
+    "/app/test_reports/pytest/phase21_polish_results.xml"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "test_credentials": "APP_PASSWORD=555 (POST /api/auth/login {password:'555'} returns JWT).",
+  "seed_data_creation": "Two TEST_p21_* projects + two workflows were created per run and have been deleted via a one-off cleanup script (4 projects, 4 workflows removed — included stragglers from earlier failed attempts).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 3 validated the Phase 21 polish pass: manifest exposure on /implemented, Cache-Control + X-NXT1-* headers on /source, named_export+file annotation on /blocks/{id}, and the shared _has_entry helper. KEY GOTCHA for next agent: the public preview URL (https://preserve-load.preview.emergentagent.com) has a Cloudflare cache rule that REWRITES Cache-Control to 'no-store, no-cache, must-revalidate'. To verify backend cache headers, you MUST curl http://localhost:8001 directly. X-* custom headers DO pass through, so they're safe to assert from either URL. Also note: motor's AsyncIOMotorClient binds to whichever event loop is active at construction time — if your test uses multiple asyncio.run() calls, build a fresh client inside each and overwrite workflow_service._db/COL, otherwise you'll hit 'Event loop is closed'. Frontend-only changes (ResumeWorkflowChip.jsx, ChatPanel.jsx, scripts/sync_block_sources.js) were not exercised in this iteration; they reuse already-validated /api/workflows/list and /api/workflows/{id}/resume endpoints so a manual UI smoke is the recommended next step.",
+  "rca of the issue": "N/A — no production issues. Two test-only issues encountered during this iteration: (1) Cache-Control header missing on public URL — root cause: K8s/Cloudflare ingress override (verified by hitting localhost:8001 directly which emits the correct header). Mitigation: test now hits localhost:8001 for the cache-header assertion and BASE_URL for the X-* header pass-through. (2) 'Event loop is closed' in the workflow-lifecycle test — same Motor/asyncio.run() interaction noted in iteration 2's RCA. Mitigation: each asyncio.run() now constructs a fresh AsyncIOMotorClient and rebinds workflow_service._db / .COL inside the coroutine, so the service code operates on a client bound to the current loop. Tests are now stable across re-runs."
+}

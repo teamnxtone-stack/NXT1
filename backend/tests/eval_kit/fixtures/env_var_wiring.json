@@ -1,0 +1,43 @@
+{
+  "id": "env-var-wiring",
+  "title": "Wire an existing fetch call to read its base URL from an env var",
+  "user_message": "Update the API client to read its base URL from `import.meta.env.VITE_API_URL` instead of the hardcoded localhost. If the env var is missing, fall back to `http://localhost:8000`. Also add a `.env.example` file documenting the variable.",
+  "starting_files": [
+    {
+      "path": "index.html",
+      "content": "<!doctype html><html><head><title>App</title></head><body><div id='root'></div><script type='module' src='/src/main.jsx'></script></body></html>"
+    },
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"nxt1-vite-app\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": { \"dev\": \"vite\", \"build\": \"vite build\" },\n  \"dependencies\": { \"react\": \"^18.3.1\", \"react-dom\": \"^18.3.1\" },\n  \"devDependencies\": { \"vite\": \"^5.4.10\", \"@vitejs/plugin-react\": \"^4.3.4\" }\n}\n"
+    },
+    {
+      "path": "vite.config.js",
+      "content": "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nexport default defineConfig({ plugins: [react()] });\n"
+    },
+    {
+      "path": "src/main.jsx",
+      "content": "import { createRoot } from 'react-dom/client';\nimport App from './App';\ncreateRoot(document.getElementById('root')).render(<App />);\n"
+    },
+    {
+      "path": "src/App.jsx",
+      "content": "import { useEffect, useState } from 'react';\nimport { fetchStatus } from './api';\nexport default function App() {\n  const [s, setS] = useState(null);\n  useEffect(() => { fetchStatus().then(setS); }, []);\n  return <main><h1>Status: {s ? JSON.stringify(s) : 'loading…'}</h1></main>;\n}\n"
+    },
+    {
+      "path": "src/api.js",
+      "content": "const BASE_URL = 'http://localhost:8000';\nexport async function fetchStatus() {\n  const r = await fetch(`${BASE_URL}/api/health`);\n  return r.json();\n}\n"
+    },
+    {
+      "path": "README.md",
+      "content": "# NXT1 Vite App\n"
+    }
+  ],
+  "protocol": "tag",
+  "expected": {
+    "paths_present": ["src/api.js", "package.json", "vite.config.js"],
+    "paths_created": [".env.example"],
+    "keywords_in_any": ["VITE_API_URL", "import.meta.env"],
+    "no_validation_errors": true,
+    "max_files_changed": 4
+  }
+}
