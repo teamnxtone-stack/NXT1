@@ -75,6 +75,7 @@ from routes.agentos_v2 import router as agentos_v2_router  # noqa: E402
 from routes.social import router as social_router  # noqa: E402
 from routes.video import router as video_router  # noqa: E402
 from routes.social_oauth import router as social_oauth_router  # noqa: E402
+from routes.agent_memory import router as agent_memory_router  # noqa: E402
 from services.social_scheduler import scheduler_loop as social_scheduler_loop  # noqa: E402
 from routes._deps import db as _shared_db  # noqa: E402
 
@@ -127,6 +128,7 @@ for r in (
     social_router,
     video_router,
     social_oauth_router,
+    agent_memory_router,
 ):
     app.include_router(r)
 

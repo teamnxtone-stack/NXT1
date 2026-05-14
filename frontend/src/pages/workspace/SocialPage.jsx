@@ -9,19 +9,18 @@
  * does NOT stop it. The page reconnects to any in-flight job_id stored in
  * localStorage and resumes progress display.
  */
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Send, Image as ImageIcon, Calendar as CalIcon,
   RefreshCw, Trash2, Check, Upload, ChevronDown, ChevronUp,
   Instagram, Linkedin, Twitter, Globe, Loader2, X,
-  Rocket, Clock as ClockIcon,
+  Rocket, Clock as ClockIcon, Paperclip,
 } from "lucide-react";
 import {
   socialGetProfile, socialSaveProfile, socialUploadLogo,
   socialGenerate, socialListPosts, socialUpdatePost,
   socialDeletePost, socialRegeneratePost, socialListJobs,
-  socialPublishNow, socialSchedulePost,
+  socialPublishNow, socialSchedulePost, socialUploadReference,
   mediaUrl,
 } from "@/lib/api";
 import useJobProgress, { rememberJob, recallJob, forgetJob } from "@/hooks/useJobProgress";
@@ -54,6 +53,8 @@ export default function SocialPage() {
   const [posts, setPosts] = useState([]);
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [refs, setRefs] = useState([]); // [{id, url, file}]
+  const refInputRef = useRef(null);
 
   // ─── load profile + posts on mount ─────────────────────────────────────
   useEffect(() => {
@@ -112,13 +113,33 @@ export default function SocialPage() {
         duration,
         about: profile?.about || "",
         niche: profile?.niche || "",
+        reference_image_ids: refs.map((r) => r.id),
       });
       setJobId(data.job_id);
       rememberJob("social", data.job_id);
       setBrief("");
+      setRefs([]);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to start generation");
     }
+  };
+
+  const onAttachRef = async (file) => {
+    if (!file) return;
+    if (refs.length >= 3) {
+      alert("Max 3 reference images per brief.");
+      return;
+    }
+    try {
+      const { data } = await socialUploadReference(file);
+      setRefs((prev) => [...prev, { id: data.id, url: data.url }]);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Reference upload failed");
+    }
+  };
+
+  const onRemoveRef = (id) => {
+    setRefs((prev) => prev.filter((r) => r.id !== id));
   };
 
   const onSaveProfile = async (patch) => {
@@ -239,15 +260,69 @@ export default function SocialPage() {
             <textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
-              placeholder="Tell me what content to create..."
+              placeholder="Tell me what content to create... (you can attach reference images)"
               rows={3}
               data-testid="social-brief-input"
               className="w-full bg-transparent outline-none resize-none text-[14.5px] leading-relaxed placeholder:opacity-60"
               style={{ color: "var(--nxt-fg)" }}
             />
+            {refs.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap pt-1">
+                {refs.map((r) => (
+                  <div
+                    key={r.id}
+                    className="relative h-14 w-14 rounded-lg overflow-hidden"
+                    style={{ background: "var(--nxt-surface-3)" }}
+                    data-testid={`social-ref-${r.id}`}
+                  >
+                    <img
+                      src={mediaUrl(r.url)}
+                      alt="ref"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onRemoveRef(r.id)}
+                      className="absolute top-0.5 right-0.5 h-4 w-4 grid place-items-center rounded-full"
+                      style={{ background: "rgba(0,0,0,0.7)", color: "#fff" }}
+                      data-testid={`social-ref-remove-${r.id}`}
+                    >
+                      <X size={9} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2 pt-2"
                  style={{ borderTop: "1px solid var(--nxt-border)" }}>
               <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => refInputRef.current?.click()}
+                  data-testid="social-attach-btn"
+                  className="h-8 w-8 rounded-full inline-flex items-center justify-center transition"
+                  style={{
+                    background: "var(--nxt-surface-3)",
+                    color: "var(--nxt-fg-dim)",
+                    border: "1px solid var(--nxt-border-strong)",
+                  }}
+                  title="Attach reference image"
+                  aria-label="Attach reference image"
+                >
+                  <Paperclip size={14} />
+                </button>
+                <input
+                  ref={refInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  data-testid="social-attach-input"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onAttachRef(f);
+                    e.target.value = "";
+                  }}
+                />
                 {ALL_PLATFORMS.map(({ id, icon: Icon }) => {
                   const active = platforms.includes(id);
                   return (

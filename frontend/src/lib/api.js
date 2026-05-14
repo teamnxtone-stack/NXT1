@@ -364,6 +364,13 @@ export const socialUploadLogo = (file) => {
   });
 };
 export const socialGenerate = (payload) => api.post("/social/generate", payload);
+export const socialUploadReference = (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.post("/social/upload-reference", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
 export const socialListJobs = (limit = 20) => api.get("/social/jobs", { params: { limit } });
 export const socialListPosts = (params = {}) => api.get("/social/posts", { params });
 export const socialGetPost = (id) => api.get(`/social/posts/${id}`);
@@ -405,6 +412,14 @@ export const videoPostToSocial = (payload) => api.post("/video/post-to-social", 
 
 // Generic jobs polling
 export const getJob = (jobId) => api.get(`/jobs/${jobId}`);
+
+// Agent memory (per-user, shared across all agents)
+export const memoryList = (params = {}) => api.get("/memory", { params });
+export const memoryAdd = (payload) => api.post("/memory", payload);
+export const memoryUpdate = (id, patch) => api.patch(`/memory/${id}`, patch);
+export const memoryDelete = (id) => api.delete(`/memory/${id}`);
+export const memoryContext = (scope = "global") =>
+  api.get("/memory/context", { params: { scope } });
 
 // Absolute URL helper for media served by the backend
 export const mediaUrl = (path) => {

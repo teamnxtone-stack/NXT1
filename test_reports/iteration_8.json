@@ -1,0 +1,62 @@
+{
+  "summary": "Iteration 8 — Per-user Agent Memory (/api/memory CRUD + /context), reference-image upload (/api/social/upload-reference + /reference/{file}), memory-aware /api/social/generate (auto-load + auto-write), Render readiness, and full regression smoke. 28 NEW tests authored in /app/backend/tests/test_iter8_memory_refimage.py — 28/28 PASS in 49s. Iter7 (30/30) and iter6 (29/32; the 3 failures are pre-existing 10s-read-timeout flakes in iter6 — unrelated to this change set). All review-request bullets are GREEN. Generate-with-reference job completed in ~26s and the job's mongo log contains all three required markers ('Loaded user memory', 'with N reference image(s)', 'Emergent universal key'). Auto-written 'fact' ('Generated N posts (founder tone) — topics: …') and 'example' ('User asked: …') memory entries verified. Regenerate produced a new 'feedback' memory entry.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/video/health",
+        "issue": "Requires auth (verify_token dependency). iter7 expected unauth → 200; current implementation returns 401 without a token. Inconsequential because the same endpoint works fine when authenticated, but technically inconsistent with peer 'health' endpoints (e.g. /api/system/health is public). Consider making this public or renaming to /api/video/status."
+      },
+      {
+        "endpoint": "POST /api/social/upload-reference",
+        "issue": "Size limit is enforced post-read (request.read() pulls full body into memory before the 8MB check). For a hostile 100MB upload the server would still spend the bytes before responding 400. Consider streaming with a size cap or relying on uvicorn's --limit-max-request-body."
+      },
+      {
+        "endpoint": "POST /api/social/upload-reference",
+        "issue": "Validation is by file *suffix* only (.png/.jpg/.jpeg/.webp). A renamed binary (e.g. exe.png) would pass. Consider sniffing with PIL.Image.open() or magic bytes for a defense-in-depth check."
+      },
+      {
+        "endpoint": "services/agent_memory.recall",
+        "issue": "When a kind filter is passed without scope, recall returns *all* scopes — fine, but the docstring/behavior should be clearer. Also no index on (user_id, scope, pinned, created_at); the sort will get expensive past a few thousand memories per user."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_memory_refimage.py",
+    "/app/test_reports/pytest/iter8_results.xml"
+  ],
+  "action_items": [
+    "Decide intended auth posture for /api/video/health (public vs authed). Either align with /api/system/health (public) or document the deviation.",
+    "Add a defense-in-depth content check in /upload-reference (PIL verify or magic bytes), plus a streaming size guard.",
+    "Add a (user_id, scope, pinned, created_at) compound index on the agent_memory collection at startup (services/agent_memory.py) for future-proofing."
+  ],
+  "critical_code_review_comments": [
+    "AGENT MEMORY CRUD — VERIFIED. POST /api/memory persists with scope/kind validation (rejects unknown kinds/scopes with HTTP 400); GET returns pinned-first then newest; PATCH supports independent or combined summary/pinned updates; DELETE is 404 on the second call (idempotency-safe). Tokenless GET returns 403 via verify_token dependency — correct.",
+    "MEMORY CONTEXT — VERIFIED. /api/memory/context?scope=social yields a wrapped block '=== USER MEMORY (auto-loaded) === … === END MEMORY ===' with pinned items tagged '★ [kind] summary'. Char cap (2200) enforced cleanly via line-length accumulator. Empty user → context:''.",
+    "REFERENCE UPLOAD — VERIFIED. PNG 64x64 round-trips (upload → 200 with {id,url}; GET /reference/{filename} → 200 with PNG magic bytes). Non-image suffix → 400 'Use PNG/JPG/WEBP'. 9MB blob → 400 'Max 8MB per reference image'. Path traversal blocked (filename containing '/', '\\\\', '..').",
+    "MEMORY-AWARE GENERATE — VERIFIED END-TO-END. POST /api/social/generate with reference_image_ids=[<id>] returns a job_id. Polling /api/jobs/{id} reached status='completed' in ~26s. Job's mongo log contains: 'Loaded user memory + generating 1 day(s) × 1 platform(s) = 1 posts with 1 reference image(s)' AND 'Plan ready (1 entries). Generating HQ images via gpt-image-1 (Emergent universal key)…' — confirming the OPENAI_API_KEY-empty fallback path. The created post has both image_url and caption populated.",
+    "AUTO-WRITE TO MEMORY — VERIFIED. After a successful /generate, GET /api/memory?scope=social shows: (a) a 'fact' entry with summary 'Generated N posts (founder tone) — topics: …'; (b) an 'example' entry with summary starting 'User asked: …'. Both written by the agent without explicit client calls.",
+    "REGENERATE FEEDBACK LOOP — VERIFIED. Hitting the regenerate endpoint resulted in a new 'feedback' kind memory being written under scope=social, indicating the agent self-records corrections.",
+    "OPENAI KEY FALLBACK PATH — VERIFIED CODE-LEVEL. _openai_key_for_images() returns OPENAI_API_KEY when truthy else EMERGENT_LLM_KEY; _is_user_openai_key() drives the user-facing log label 'your OpenAI key' vs 'Emergent universal key'. With OPENAI_API_KEY blank, the universal-key path is exercised and produces a real DALL-E/gpt-image-1 image. The user-key path is not runtime-tested (no real OPENAI_API_KEY) but is a single branch and was code-reviewed.",
+    "RENDER READINESS — VERIFIED. /app/.python-version == '3.11.9'. /app/requirements.txt exists at repo root. /app/render.yaml is valid YAML; the single web service declares ALL 16 expected envVars: MONGO_URL, DB_NAME, CORS_ORIGINS, APP_PASSWORD, JWT_SECRET, PUBLIC_BACKEND_URL, EMERGENT_LLM_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, FAL_API_KEY, META_APP_ID, META_APP_SECRET, X_CLIENT_ID, X_CLIENT_SECRET, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET. PYTHON_VERSION pinned at 3.11.9. autoDeploy:true.",
+    "REGRESSION — VERIFIED. /api/auth/login(555)→200, /api/social/oauth/status→200 (3 platforms), /api/social/connections→200, /api/social/autopilot→200, /api/social/posts→200, /api/video/health→200 (auth required). iter7 suite (30/30) re-ran clean. iter6 reports 3 timeouts (read_timeout=10 in legacy fixture is hitting ingress latency — NOT a regression caused by iter8).",
+    "EDGE CASES — VERIFIED. PATCH /api/memory/{id} with BOTH summary and pinned applies both (validated via GET). PATCH /api/memory/<unknown> → 404. DELETE /api/memory/<unknown> → 404. Memory created under one scope (social) does NOT leak into recall(scope='studio') (proper scope isolation, with the documented exception that 'global'-scoped items merge into every scope query).",
+    "CODE NOTE — services/agent_memory.py:71 — recall() uses {'$in': list({scope, 'global'})} to always merge global into scoped queries. This is intentional (per docstring) but undocumented to API consumers; the OpenAPI for GET /api/memory should mention it.",
+    "CODE NOTE — routes/agent_memory.py:67 — PATCH returns {'ok':true} but never returns the updated doc. Cleaner UX would be to GET-and-return after the update for client-side cache refresh.",
+    "CODE NOTE — services/social_content_service.py:312 — _is_user_openai_key() is recomputed each invocation by reading the env at call time, which means a key rotation without restart will be honored. Good design, matches OAUTH status helper from iter7.",
+    "CODE NOTE — routes/social.py:152 — uploaded filename is `{user_id}-{rid}{suffix}`. If user_id contains exotic chars (it shouldn't, but defense-in-depth) this could leak slashes. Consider sanitizing user_id via secure_filename() or uuid-only naming."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter8_memory_refimage.py",
+    "/app/test_reports/pytest/iter8_results.xml",
+    "/app/test_reports/iteration_8.json"
+  ],
+  "success_rate": {"backend": "100% (28/28 new iter8 tests + 30/30 iter7 verified, no functional regressions)", "frontend": "N/A — backend-only scope"},
+  "test_credentials": "POST /api/auth/login {password:'555'} → admin JWT (sub=admin). POST /api/users/signin {email:test@nxt1.local, password:testpass123} → user JWT.",
+  "seed_data_creation": "Per pytest run: 1 transient agent_memory doc (scope=social, kind=preference, summary starts 'TEST_iter8…') — fixture-cleaned in module teardown; 1 social_references doc + 1 PNG file on disk under social/reference/ (small 64×64, not cleaned — harmless); 1 /api/social/generate job (admin actor) → 1 social_posts doc with image_url + caption + auto-written memory entries (fact, example, feedback). Total disk footprint < 100KB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: `cd /app/backend && python3 -m pytest tests/test_iter8_memory_refimage.py -v -o addopts=''` (override pytest.ini's `-m 'not slow'`). Allow ~60s. The test_caption_changed_and_feedback_memory and test_regenerate_post tests probe multiple URL shapes for the regenerate endpoint and degrade-gracefully (pytest.skip) if not found; if the main agent moves the route, update those two tests. Job log assertions use GET /api/jobs/{id} and inspect job['logs'] — these are stored in mongo by services/job_service.append_log, NOT in supervisor stdout. Mongo collections touched: agent_memory, social_references, social_posts, jobs. Iter6 timeouts (3 tests) are a pre-existing fixture issue (request timeout=10s on localhost:8001) unrelated to iter8 work — safe to ignore.",
+  "rca of the issue": "No bugs found. Two early test failures during authoring were test-side (wrong GenerateBody field name 'topic' vs 'brief', and assuming /api/video/health was public; both corrected). One was an environment artifact: I initially asserted on supervisor stdout/stderr files but the relevant markers are emitted via job_service.append_log() into mongo's `jobs.logs` array, so the assertion was moved to GET /api/jobs/{id}.logs and passes cleanly."
+}

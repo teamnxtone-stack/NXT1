@@ -14,8 +14,33 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "*"
+      - key: APP_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PUBLIC_BACKEND_URL
+        sync: false
+      # AI keys
       - key: EMERGENT_LLM_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Video
       - key: FAL_API_KEY
+        sync: false
+      # Social OAuth
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: X_CLIENT_ID
+        sync: false
+      - key: X_CLIENT_SECRET
+        sync: false
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      - key: LINKEDIN_CLIENT_SECRET
         sync: false
     autoDeploy: true

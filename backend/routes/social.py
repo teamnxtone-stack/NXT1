@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from services import job_service
 from services.social_content_service import (
     ASSETS_DIR,
+    REF_IMG_DIR,
     run_social_job,
     regenerate_post as _regenerate_post,
 )
@@ -42,12 +43,13 @@ LOGOS_DIR.mkdir(parents=True, exist_ok=True)
 
 class GenerateBody(BaseModel):
     brief: str = Field(..., min_length=2, max_length=4000)
-    tone: str = Field(default="professional")  # professional | founder | casual | personal
-    platform: str = Field(default="all")       # all | instagram | linkedin | twitter
-    platforms: Optional[list[str]] = None      # explicit list overrides platform
-    duration: str = Field(default="this week") # today | this week | "daily for 14"
+    tone: str = Field(default="professional")
+    platform: str = Field(default="all")
+    platforms: Optional[list[str]] = None
+    duration: str = Field(default="this week")
     about: str = Field(default="")
     niche: str = Field(default="")
+    reference_image_ids: Optional[list[str]] = None  # IDs from /upload-reference
 
 
 class ProfileBody(BaseModel):
@@ -129,16 +131,71 @@ async def get_logo(filename: str):
 
 
 # ------------------------------------------------------------------ generation
+@router.post("/upload-reference")
+async def upload_reference(
+    file: UploadFile = File(...),
+    user_id: str = Depends(verify_token),
+):
+    """Attach a reference image to the next /generate request.
+
+    Returns {id, url}. Pass the id back via GenerateBody.reference_image_ids.
+    """
+    if not file.filename:
+        raise HTTPException(400, "No file")
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".png", ".jpg", ".jpeg", ".webp"):
+        raise HTTPException(400, "Use PNG/JPG/WEBP")
+    content = await file.read()
+    if len(content) > 8 * 1024 * 1024:
+        raise HTTPException(400, "Max 8MB per reference image")
+    rid = uuid.uuid4().hex
+    fn = f"{user_id}-{rid}{suffix}"
+    dest = REF_IMG_DIR / fn
+    dest.write_bytes(content)
+    doc = {
+        "id": rid,
+        "user_id": user_id,
+        "filename": fn,
+        "file_path": str(dest),
+        "url": f"/api/social/reference/{fn}",
+        "size_bytes": len(content),
+        "created_at": job_service._now(),
+    }
+    await db.social_references.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/reference/{filename}")
+async def get_reference(filename: str):
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "Bad filename")
+    p = REF_IMG_DIR / filename
+    if not p.exists():
+        raise HTTPException(404, "Not found")
+    return FileResponse(str(p))
+
+
 @router.post("/generate")
 async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
     """Kick off a background job. Returns job_id immediately.
 
-    The job runs as a detached asyncio.Task on the backend — it survives the
-    HTTP request, browser close, and client disconnect. Progress is in the
-    `jobs` collection (queryable via /api/jobs/{id}).
+    The job runs as a detached asyncio.Task — survives request, browser close,
+    client disconnect. Progress in `jobs` collection.
     """
     profile = await db.social_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
     logo_path = profile.get("logo_path")
+
+    # Resolve reference image IDs → file paths
+    ref_paths: list[str] = []
+    if body.reference_image_ids:
+        cur = db.social_references.find(
+            {"user_id": user_id, "id": {"$in": body.reference_image_ids}},
+            {"_id": 0, "file_path": 1},
+        )
+        async for d in cur:
+            if d.get("file_path"):
+                ref_paths.append(d["file_path"])
 
     job = await job_service.start(
         db,
@@ -148,12 +205,11 @@ async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
         initial_logs=[{
             "ts": job_service._now(),
             "level": "info",
-            "msg": f"Social content generation started — brief='{body.brief[:80]}'",
+            "msg": f"Social content generation started — brief='{body.brief[:80]}'" +
+                   (f" + {len(ref_paths)} reference image(s)" if ref_paths else ""),
         }],
     )
 
-    # Detach: NEVER await this. The task lives on the event loop independent
-    # of the request lifecycle. If the loop is alive, the job keeps running.
     asyncio.create_task(run_social_job(
         db, job["id"],
         user_id=user_id,
@@ -165,6 +221,7 @@ async def generate(body: GenerateBody, user_id: str = Depends(verify_token)):
         about=body.about or profile.get("about", ""),
         niche=body.niche or profile.get("niche", ""),
         logo_path=logo_path,
+        reference_image_paths=ref_paths or None,
     ))
 
     return {"job_id": job["id"], "status": "running"}
