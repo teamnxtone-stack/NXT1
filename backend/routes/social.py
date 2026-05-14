@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from services import job_service
+from services import job_service, asset_storage
 from services.social_content_service import (
     ASSETS_DIR,
     REF_IMG_DIR,
@@ -108,18 +108,19 @@ async def upload_logo(
     if suffix not in (".png", ".jpg", ".jpeg", ".webp"):
         raise HTTPException(400, "Use PNG/JPG/WEBP")
     fn = f"{user_id}-{uuid.uuid4().hex}{suffix}"
-    dest = LOGOS_DIR / fn
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(400, "Logo must be <5MB")
-    dest.write_bytes(content)
-    logo_url = f"/api/social/logo/{fn}"
+    res = asset_storage.put_bytes(folder="social/logos", filename=fn, data=content)
+    logo_url = res["url"]
+    logo_path_for_overlay = res.get("file_path")  # only present on local backend
     await db.social_profiles.update_one(
         {"user_id": user_id},
-        {"$set": {"logo_path": str(dest), "logo_url": logo_url}},
+        {"$set": {"logo_path": logo_path_for_overlay, "logo_url": logo_url,
+                  "logo_storage": res["backend"], "logo_key": res.get("key")}},
         upsert=True,
     )
-    return {"logo_path": str(dest), "logo_url": logo_url}
+    return {"logo_path": logo_path_for_overlay, "logo_url": logo_url}
 
 
 @router.get("/logo/{filename}")
@@ -150,14 +151,15 @@ async def upload_reference(
         raise HTTPException(400, "Max 8MB per reference image")
     rid = uuid.uuid4().hex
     fn = f"{user_id}-{rid}{suffix}"
-    dest = REF_IMG_DIR / fn
-    dest.write_bytes(content)
+    res = asset_storage.put_bytes(folder="social/refs", filename=fn, data=content)
     doc = {
         "id": rid,
         "user_id": user_id,
         "filename": fn,
-        "file_path": str(dest),
-        "url": f"/api/social/reference/{fn}",
+        "file_path": res.get("file_path"),
+        "storage_backend": res["backend"],
+        "storage_key": res.get("key"),
+        "url": res["url"],
         "size_bytes": len(content),
         "created_at": job_service._now(),
     }

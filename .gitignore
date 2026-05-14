@@ -115,3 +115,17 @@ credentials.json
 *.pem
 *.key
 .credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+.pnpm-store/v3/files/4f/f0662161cc14acf853f79668c3148469cbdd59b98281747e0f27e8ebd1725448db7eac8d9cccb978f85538910cf4c4ed0e568e846cbf222c61b2f5b5ffc62f-exec
+.pnpm-store/v3/files/22/a7f249aa51792de1f82c925ff9698f9339c7039d264b20e3ad1cb3540d5137c3c69987047b92b70d57e3fe09661ba49e4b606c8616cd38cceada04d6bdaaba-exec
+frontend/node_modules/.cache/default-development/15.pack
+services/video-studio/node_modules/.pnpm/@cloudflare+workerd-linux-arm64@1.20250718.0/node_modules/@cloudflare/workerd-linux-arm64/bin/workerd
+services/bolt-engine/node_modules/.pnpm/@cloudflare+workerd-linux-arm64@1.20251011.0/node_modules/@cloudflare/workerd-linux-arm64/bin/workerd

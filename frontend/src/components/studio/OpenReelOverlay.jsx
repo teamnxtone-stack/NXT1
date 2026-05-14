@@ -1,12 +1,10 @@
 /**
- * BoltDiyOverlay — when bolt.diy sidecar is reachable AT A PUBLIC HTTPS URL,
- * takes over the BuilderPage with a full-page iframe. When the configured
- * URL is localhost/127.0.0.1 (preview pod / not yet deployed) we render
- * NOTHING so the native NXT1 builder stays the primary UI and the page
- * never goes blank.
+ * OpenReelOverlay — when the OpenReel video-studio sidecar is reachable, takes
+ * over the entire StudioPage with a full-page iframe (the primary video editor).
+ * When NOT reachable, renders nothing — the native Fal.ai Studio stays the
+ * dormant fallback so nothing breaks.
  *
- * Production: set BOLT_DIY_URL to the public https URL of your bolt.diy
- * service in Render env. The moment that's reachable, this overlay takes over.
+ * Set STUDIO_URL in backend .env to override the default http://localhost:5174.
  */
 import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
@@ -14,20 +12,18 @@ import api from "@/lib/api";
 
 function isPublicUrl(url) {
   if (!url) return false;
-  // Block localhost / 127.* / private LAN — those NEVER iframe correctly
-  // from a public HTTPS preview URL on the user's browser.
   return /^https?:\/\//i.test(url) &&
          !/(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(url);
 }
 
-export default function BoltDiyOverlay() {
+export default function OpenReelOverlay() {
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
     let cancel = false;
     const probe = async () => {
       try {
-        const r = await api.get("/v1/agentos/builder/status");
+        const r = await api.get("/v1/agentos/studio/status");
         if (!cancel) setStatus(r.data);
       } catch {
         if (!cancel) setStatus({ reachable: false, url: "" });
@@ -38,23 +34,22 @@ export default function BoltDiyOverlay() {
     return () => { cancel = true; clearInterval(t); };
   }, []);
 
-  // Only overlay when reachable AND URL is publicly accessible from the user's browser.
   if (!status?.reachable || !isPublicUrl(status.url)) return null;
 
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col"
       style={{ background: "#0A0A0B" }}
-      data-testid="boltdiy-overlay"
+      data-testid="openreel-overlay"
     >
       <header
         className="flex items-center gap-3 h-11 px-3 sm:px-4"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         <span className="mono text-[10.5px] tracking-[0.28em] uppercase"
-              style={{ color: "rgba(255,255,255,0.45)" }}>builder · bolt.diy</span>
+              style={{ color: "rgba(255,255,255,0.45)" }}>studio · openreel</span>
         <span className="ml-1 mono text-[9.5px] px-1.5 py-0.5 rounded font-semibold"
-              style={{ background: "rgba(94,234,212,0.18)", color: "#5EEAD4" }}>READY</span>
+              style={{ background: "rgba(167,139,250,0.18)", color: "#A78BFA" }}>READY</span>
         <span className="flex-1" />
         <a
           href={status.url}
@@ -62,12 +57,13 @@ export default function BoltDiyOverlay() {
           rel="noreferrer"
           className="text-[11.5px] inline-flex items-center gap-1 opacity-70 hover:opacity-100"
           style={{ color: "#FAFAFA" }}
+          data-testid="openreel-open-tab"
         >
           Open in new tab <ExternalLink size={11} />
         </a>
       </header>
       <iframe
-        title="bolt.diy"
+        title="openreel"
         src={status.url}
         className="flex-1 w-full border-0"
         style={{ background: "#0A0A0B" }}

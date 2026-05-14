@@ -575,7 +575,7 @@ _POSTIZ_URL = os.environ.get("POSTIZ_URL", "http://localhost:5000")
 _BOLT_URL   = os.environ.get("BOLT_DIY_URL", "http://localhost:5173")
 
 
-async def _probe_url(url: str, timeout: float = 1.2) -> bool:
+async def _probe_url(url: str, timeout: float = 3.0) -> bool:
     """Lightweight liveness probe — used by Social/Builder tabs to decide
     whether to render the iframe or a "boot it" notice. Never raises."""
     try:
@@ -747,5 +747,27 @@ async def builder_status(_: str = Depends(verify_token)):
         "service": "bolt.diy",
         "url": _BOLT_URL,
         "reachable": await _probe_url(_BOLT_URL),
-        "boot_hint": "docker compose --profile builder up -d",
+        "boot_hint": "supervisorctl start bolt-engine",
     }
+
+
+# ---------------------------------------------------------------------------
+# Studio — OpenReel sidecar liveness probe
+# ---------------------------------------------------------------------------
+_STUDIO_URL = os.environ.get("STUDIO_URL", "http://localhost:5174")
+
+
+@router.get("/studio/status")
+async def studio_status(_: str = Depends(verify_token)):
+    return {
+        "service": "openreel",
+        "url": _STUDIO_URL,
+        "reachable": await _probe_url(_STUDIO_URL),
+        "boot_hint": "supervisorctl start video-studio",
+    }
+
+
+@router.get("/storage/status")
+async def storage_status(_: str = Depends(verify_token)):
+    from services import asset_storage
+    return asset_storage.status()

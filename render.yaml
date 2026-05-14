@@ -27,6 +27,22 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Sidecars
+      - key: BOLT_DIY_URL
+        sync: false
+      - key: STUDIO_URL
+        sync: false
+      # Cloudflare R2 storage
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_PUBLIC_BASE
+        sync: false
       # Video
       - key: FAL_API_KEY
         sync: false

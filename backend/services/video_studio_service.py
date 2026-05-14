@@ -26,7 +26,7 @@ from typing import Optional
 
 import httpx
 
-from services import job_service
+from services import job_service, asset_storage
 
 logger = logging.getLogger("nxt1.video")
 
@@ -227,9 +227,10 @@ async def run_video_job(
         data = await _download(video_url)
 
         fn = f"{uuid.uuid4().hex}.mp4"
-        out = CLIPS_DIR / fn
-        out.write_bytes(data)
-        local_url = f"/api/video/clips/{fn}"
+        res = asset_storage.put_bytes(
+            folder="video/clips", filename=fn, data=data, content_type="video/mp4"
+        )
+        local_url = res["url"]
 
         clip = {
             "id": str(uuid.uuid4()),
@@ -241,7 +242,9 @@ async def run_video_job(
             "prompt": prompt,
             "style": style,
             "duration_s": duration_s,
-            "file_path": str(out),
+            "file_path": res.get("file_path"),
+            "storage_backend": res["backend"],
+            "storage_key": res.get("key"),
             "url": local_url,
             "remote_url": video_url,
             "size_bytes": len(data),
@@ -264,8 +267,8 @@ async def save_uploaded_clip(user_id: str, file_bytes: bytes, filename: str) -> 
     if suffix not in (".mp4", ".mov", ".webm"):
         raise ValueError("Use mp4 / mov / webm")
     fn = f"{uuid.uuid4().hex}{suffix}"
-    out = CLIPS_DIR / fn
-    out.write_bytes(file_bytes)
+    res = asset_storage.put_bytes(folder="video/clips", filename=fn, data=file_bytes,
+                                  content_type="video/mp4")
     return {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -273,8 +276,10 @@ async def save_uploaded_clip(user_id: str, file_bytes: bytes, filename: str) -> 
         "model": None,
         "mode": None,
         "filename": filename,
-        "file_path": str(out),
-        "url": f"/api/video/clips/{fn}",
+        "file_path": res.get("file_path"),
+        "storage_backend": res["backend"],
+        "storage_key": res.get("key"),
+        "url": res["url"],
         "size_bytes": len(file_bytes),
         "created_at": _now(),
     }
@@ -285,14 +290,15 @@ async def save_reference_image(user_id: str, file_bytes: bytes, filename: str) -
     if suffix not in (".png", ".jpg", ".jpeg", ".webp"):
         raise ValueError("Use png/jpg/webp")
     fn = f"{user_id}-{uuid.uuid4().hex}{suffix}"
-    out = REF_IMG_DIR / fn
-    out.write_bytes(file_bytes)
+    res = asset_storage.put_bytes(folder="video/refs", filename=fn, data=file_bytes)
     return {
         "id": uuid.uuid4().hex,
         "user_id": user_id,
         "filename": fn,
-        "file_path": str(out),
-        "url": f"/api/video/refs/{fn}",
+        "file_path": res.get("file_path"),
+        "storage_backend": res["backend"],
+        "storage_key": res.get("key"),
+        "url": res["url"],
         "size_bytes": len(file_bytes),
         "created_at": _now(),
     }
@@ -372,14 +378,22 @@ async def export_timeline(db, user_id: str, clip_ids: list[str], name: str = "ex
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _ffmpeg_concat, paths, str(out_path))
 
+    # Push stitched mp4 through storage facade (R2 in prod, local in dev)
+    res = asset_storage.put_file(
+        folder="video/exports", filename=out_name,
+        src_path=str(out_path), content_type="video/mp4",
+    )
+
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "name": name or "export",
         "clip_ids": clip_ids,
-        "file_path": str(out_path),
-        "url": f"/api/video/exports/{out_name}",
-        "size_bytes": out_path.stat().st_size,
+        "file_path": res.get("file_path") or str(out_path),
+        "storage_backend": res["backend"],
+        "storage_key": res.get("key"),
+        "url": res["url"],
+        "size_bytes": res["size"],
         "created_at": _now(),
     }
     await db.video_exports.insert_one(dict(doc))

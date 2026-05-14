@@ -26,7 +26,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
 from PIL import Image
 
-from services import agent_memory, job_service
+from services import agent_memory, job_service, asset_storage
 
 logger = logging.getLogger("nxt1.social")
 
@@ -257,9 +257,9 @@ async def _generate_image(prompt: str, logo_path: Optional[str]) -> Optional[str
             raw = base64.b64decode(raw)
         final = _overlay_logo(raw, logo_path)
         fn = f"{uuid.uuid4().hex}.png"
-        out = ASSETS_DIR / fn
-        out.write_bytes(final)
-        return f"/api/social/assets/{fn}"
+        # Storage facade: R2 if configured, else local disk
+        res = asset_storage.put_bytes(folder="social", filename=fn, data=final, content_type="image/png")
+        return res["url"]
     except Exception as e:
         logger.error(f"image gen failed: {e}")
         return None

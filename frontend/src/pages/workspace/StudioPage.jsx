@@ -25,6 +25,7 @@ import {
   videoUploadReference, videoExport, mediaUrl,
 } from "@/lib/api";
 import useJobProgress, { rememberJob, recallJob, forgetJob } from "@/hooks/useJobProgress";
+import OpenReelOverlay from "@/components/studio/OpenReelOverlay";
 
 const STYLES = [
   { id: "realistic", label: "Realistic" },
@@ -139,6 +140,9 @@ export default function StudioPage() {
       data-testid="studio-page"
       style={{ background: "var(--nxt-bg)", color: "var(--nxt-fg)" }}
     >
+      {/* When OpenReel sidecar is up, it takes over via this overlay (z-60).
+          When down, the native Fal.ai studio below stays fully functional. */}
+      <OpenReelOverlay />
       {/* HEADER */}
       <header
         className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-3"
