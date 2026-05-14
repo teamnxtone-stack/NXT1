@@ -68,13 +68,17 @@ const ITEMS = [
     icon: Wrench,
     color: "text-amber-300",
   },
-  {
-    key: "uiblocks",
-    label: "Premium UI blocks",
-    blurb: "Magic UI · Aceternity · Origin",
-    icon: Layers,
-    color: "text-violet-300",
-  },
+  // "Premium UI blocks" tile intentionally hidden — the 17-block registry now
+  // lives backend-only at /api/ui/registry and is auto-retrieved by the build
+  // agent when a user describes what they want. The UI surface is no longer
+  // exposed to end users (per product direction).
+  // {
+  //   key: "uiblocks",
+  //   label: "Premium UI blocks",
+  //   blurb: "Magic UI · Aceternity · Origin",
+  //   icon: Layers,
+  //   color: "text-violet-300",
+  // },
   {
     key: "migration",
     label: "Migration",

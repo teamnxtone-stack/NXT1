@@ -9,23 +9,23 @@
  * Phase 11 → 12 introduced.
  */
 import { useState } from "react";
-import UIBlockGallery from "@/components/workspace/UIBlockGallery";
+// UIBlockGallery hidden — the 17-block registry is backend-only now.
+// import UIBlockGallery from "@/components/workspace/UIBlockGallery";
 import WorkflowsPanel from "@/components/workspace/WorkflowsPanel";
 import HostingOS from "@/components/workspace/HostingOS";
 import SelfHealPanel from "@/components/workspace/SelfHealPanel";
 import { useSearchParams } from "react-router-dom";
-import { Layers, Workflow, Cloud, Wrench } from "lucide-react";
+import { Workflow, Cloud, Wrench } from "lucide-react";
 
 const TABS = [
-  { id: "ui",        label: "Premium UI",       icon: Layers   },
-  { id: "workflows", label: "Workflows",        icon: Workflow },
+  { id: "workflows", label: "Workflows",         icon: Workflow },
   { id: "hosting",   label: "Hosting · Domains", icon: Cloud   },
-  { id: "heal",      label: "Self-Heal",        icon: Wrench   },
+  { id: "heal",      label: "Self-Heal",         icon: Wrench   },
 ];
 
 export default function WorkspaceOperations() {
   const [params, setParams] = useSearchParams();
-  const initial = TABS.find((t) => t.id === params.get("tab"))?.id || "ui";
+  const initial = TABS.find((t) => t.id === params.get("tab"))?.id || "workflows";
   const [tab, setTab] = useState(initial);
   const setTabAndUrl = (id) => {
     setTab(id);
@@ -88,7 +88,6 @@ export default function WorkspaceOperations() {
       </div>
 
       {/* Tab content */}
-      {tab === "ui"        && <UIBlockGallery />}
       {tab === "workflows" && <WorkflowsPanel />}
       {tab === "hosting"   && <HostingOS />}
       {tab === "heal"      && (

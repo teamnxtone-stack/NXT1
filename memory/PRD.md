@@ -1,81 +1,55 @@
 # NXT1 — Product Requirements Document
 
-## Original problem statement (verbatim, latest)
-> With the social media content creator, hook it up to my OpenAI key — I want OpenAI making those photos, and I want them really really good. Add a way the chat box accepts images (like attaching photos to give context). Throughout the entire app, the agent needs to **store memory** — memories are really important. Make sure everything is ready to push and works on Render — strip any blockers. I'll add the other API keys on Render so it syncs.
+## Latest user direction (May 14, 2026)
+- Builder/Studio black-screen fixed: BoltDiyOverlay + OpenReelOverlay only iframe when the configured URL is a **public https** URL. Localhost = native UI stays primary. No more blank pages.
+- **17 Premium UI Blocks** hidden from frontend (Tools drawer + Operations tab). Registry still lives at `/api/ui/registry` and is auto-consumed by the build agent when matching user briefs → templates.
+- **Cloudflare R2 storage facade** (`services/asset_storage.py`) — every social/video upload routes through it. R2 when keys are set, local disk fallback otherwise.
+- **AI provider failures** ("Generation failed at 0%") root cause: **Emergent universal key budget exhausted** ($2.06 / $2.00 cap). The fix is on the user side: paste your own `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` (already wired everywhere — picked up automatically).
 
 ## Architecture
-- **Backend** — FastAPI + uvicorn (8001), MongoDB via motor.
-- **Frontend** — React 19 + CRACO + Tailwind + framer-motion.
-- **Persistent jobs** — `services/job_service.py` writes every long task to Mongo `jobs`. Work is `asyncio.create_task`'d → survives browser/request lifecycle. UI re-attaches via `useJobProgress` + localStorage.
-- **Agent Memory** — `services/agent_memory.py` provides per-user, scope-tagged persistent context (`global` | `social` | `studio` | `agents`). Auto-loaded into prompts as a `=== USER MEMORY ===` block (pinned first, max 2.2 KB). Auto-written by the social agent on every generate / regenerate.
-- **Background scheduler** — `services/social_scheduler.py` ticks every 60 s; publishes due posts + fires weekly auto-pilot.
-- **OAuth + posting** — `services/social_publishing_service.py` for Meta/IG, LinkedIn, X. Gated by env-var presence; activates automatically when creds are pasted.
-- **Render deploy** — `render.yaml` at root, `.python-version` at root, mirrored `requirements.txt` at root.
+- **Backend** — FastAPI/uvicorn (8001), MongoDB via motor.
+- **Frontend** — React 19 + CRACO + Tailwind + framer-motion (3000).
+- **Sidecars**:
+  - `bolt-engine` (bolt.diy app builder, port 5173) — supervisor-managed
+  - `video-studio` (OpenReel, port 5174) — supervisor-managed
+  - Both fronted by overlay components that only activate when reachable at a **public https URL**. In preview/dev → native UI primary.
+- **Storage** — `services/asset_storage.py` (R2 first, local disk fallback). Wraps existing `services/r2_service.py`.
+- **Persistent jobs** — `services/job_service.py` writes to Mongo; long tasks are detached `asyncio.create_task`. UI re-attaches via `useJobProgress` + localStorage.
+- **Agent Memory** — `services/agent_memory.py` per-user shared context, auto-loaded into every social run, page UI at `/workspace/memory`.
 
-## What's been implemented (2026-05-14)
+## What's been implemented
+- Social Content Agent (Claude + DALL-E + memory + autopilot + OAuth IG/X/LinkedIn).
+- Native Video Studio (5 Fal.ai models: Veo 3.1, Kling 2.5 Turbo Pro, Kling 2.1 Master, LTX, CogVideoX; t2v + i2v; reference images; server-side ffmpeg multi-clip MP4 export via imageio-ffmpeg).
+- Agent Memory page (`/workspace/memory`) — pin/edit/delete with scope+kind tags.
+- Cloudflare R2 storage facade — all uploads route through it.
+- bolt.diy + OpenReel sidecars installed + supervisor-managed; overlay components hand off automatically when public URL is set.
+- Render deploy fix: `render.yaml`, root `requirements.txt`, root `.python-version`, `--extra-index-url` for `emergentintegrations`, `imageio-ffmpeg` for Render-safe ffmpeg.
+- 17 Premium UI Blocks moved to backend-only catalog.
 
-### Foundation
-- Installed user's NXT1 zip; preserved `.env`s; fixed missing `eslint-config-react-app@7.0.1`.
-- Render deploy files: `render.yaml`, `.python-version`, root `requirements.txt`, fixed `backend/runtime.txt`.
-- Workspace gate password = `555` via `APP_PASSWORD`.
+## What the user must paste on Render
+**Required to get past the "AI provider temporarily unavailable" error:**
+- `ANTHROPIC_API_KEY` — your own Claude key (replaces exhausted Emergent budget for chat).
+- `OPENAI_API_KEY` — your own OpenAI key (replaces Emergent for images + chat fallback).
 
-### Social Content Agent (v2 — memory + multimodal + HQ images)
-- **OpenAI image gen prefers user's `OPENAI_API_KEY`** for top-quality `gpt-image-1`. Falls back to `EMERGENT_LLM_KEY` only if blank. Append `"— photorealistic, high detail, professional photography, 4k"` to every prompt.
-- **Multimodal brief** — chat input accepts reference images (paperclip button). Backend route `POST /api/social/upload-reference` (max 8 MB, png/jpg/webp). The agent passes them as `ImageContent` to Claude (vision) for tone/style understanding AND derives a `visual_style` summary that's appended to every image_prompt for visual cohesion across the calendar.
-- **Auto-memory** — every generation auto-loads `agent_memory(scope=social)` into the Claude prompt AND auto-writes a `fact` ("Generated N posts (founder tone) — topics: …") + `example` ("User asked: …") so the next run is smarter. Regenerate writes a `feedback` entry.
-- **Post actions**: Regenerate · Approve · Schedule · Post now · Delete (44 px touch targets, mobile-safe).
+**Required for everything else:**
+- `MONGO_URL`, `DB_NAME` — your MongoDB Atlas URI + DB name.
+- `APP_PASSWORD=555` — workspace gate.
+- `JWT_SECRET` — any 32+ char random string.
+- `PUBLIC_BACKEND_URL` — your Render https URL.
+- **Cloudflare R2** (durable storage; replaces ephemeral Render disk):
+  - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE`.
+- **Fal.ai video**: `FAL_API_KEY`.
+- **OAuth (auto-posting)**: `META_APP_ID/SECRET`, `X_CLIENT_ID/SECRET`, `LINKEDIN_CLIENT_ID/SECRET`. Register callback `{PUBLIC_BACKEND_URL}/api/social/oauth/{platform}/callback` in each platform's dev console.
+- **Sidecars (optional)**: `BOLT_DIY_URL`, `STUDIO_URL` — point to your bolt.diy + OpenReel deployments. When unset or pointing at localhost, native NXT1 UI stays primary.
 
-### Agent Memory system (NEW, NXT1-wide)
-- `services/agent_memory.py` + `routes/agent_memory.py` (`/api/memory`).
-- Kinds: `fact | preference | example | feedback | image | system`. Scopes: `global | social | studio | agents`.
-- `build_context_block` returns a ready-to-inject prompt snippet, pinned first, capped at 2200 chars.
-- Endpoints: list, add, patch (summary/pin), delete, `/context?scope=…`.
+## Render deploy known fixes
+- `requirements.txt` has `emergentintegrations==0.1.0` + `fal-client==1.0.0` pinned.
+- `render.yaml` build cmd uses `--extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/` so Render finds `emergentintegrations`.
+- `imageio-ffmpeg` ships a static ffmpeg binary inside the Python wheel — Render's Python runtime gets ffmpeg automatically (system ffmpeg not required).
 
-### Video Studio
-- `routes/video.py` + `services/video_studio_service.py` — Fal.ai `cogvideox-5b` (detached job), mp4/mov/webm upload, clip CRUD, timeline save, post-to-social.
-- AI Generate drawer + Post-to-Social modal in `pages/workspace/StudioPage.jsx`.
-
-### Social OAuth + posting + autopilot
-- `routes/social_oauth.py`, `services/social_publishing_service.py` — Meta Graph v21 (IG via page→business-account discovery → media + media_publish), LinkedIn UGC, X OAuth 2.0 + PKCE + v2 tweets.
-- `services/social_scheduler.py` — 60 s loop; publishes due posts AND fires weekly autopilots. Safe when no connection exists (just leaves posts scheduled).
-- `components/social/ConnectionsAndAutopilot.jsx` — Connect / Disconnect UI + Autopilot day/hour/brief toggle inside the Brand · Identity drawer.
-
-### Sidebar / routes
-- `/workspace/social`, `/workspace/studio`, plus existing Home / Apps / Agents / AgentOS / Account.
-
-## Testing (cumulative)
-- Iter 6 — 32/32 PASS · Social + Video core + persistence.
-- Iter 7 — 30/30 PASS · Workspace password 555 + OAuth + connections + autopilot + scheduler safety.
-- Iter 8 — 28/28 PASS · Agent Memory CRUD + reference-image upload + memory-aware generate + Render readiness + regression smoke.
-
-## Render readiness checklist (all green)
-- ✅ `render.yaml` lists every needed envVar (`sync: false` so they're set per-environment).
-- ✅ `requirements.txt` at root and at `backend/` (pinned).
-- ✅ `.python-version` at root = `3.11.9`.
-- ✅ `backend/runtime.txt` = `python-3.11.9`.
-- ✅ No hardcoded localhost in backend; all URLs via env (`MONGO_URL`, `PUBLIC_BACKEND_URL`).
-- ✅ Frontend reads `REACT_APP_BACKEND_URL` only; no API URL hardcoding.
-- ✅ Backend boots fresh — confirmed after multiple `supervisorctl restart`.
-- ✅ Scheduler safe when no connection exists.
-- ✅ Image gen falls back gracefully when `OPENAI_API_KEY` is blank.
-
-## Next Action Items
-- **P0 — Push to GitHub** (Save to GitHub button). Render auto-deploys.
-- **P0 — Set these env vars on Render**: `MONGO_URL`, `DB_NAME`, `APP_PASSWORD=555`, `JWT_SECRET` (any 32+ char random string), `PUBLIC_BACKEND_URL` (your Render URL), `EMERGENT_LLM_KEY`, **`OPENAI_API_KEY` (yours, for top-quality images)**, plus the platform creds you have: `FAL_API_KEY`, `META_APP_ID/SECRET`, `X_CLIENT_ID/SECRET`, `LINKEDIN_CLIENT_ID/SECRET`.
-- **P0 — Register OAuth callback URLs** in each platform's developer console: `{PUBLIC_BACKEND_URL}/api/social/oauth/{instagram|linkedin|twitter}/callback`.
-- **P1 — Multi-clip MP4 stitching** in Studio Export (ffmpeg.wasm or server ffmpeg endpoint).
-- **P1 — Image upload for LinkedIn + X** publishing (currently text-only on those two; IG is image-only).
-- **P1 — Memory UI** — list/pin/edit memory items in a dedicated panel (currently auto-only).
-- **P2 — WebSocket push** instead of 1.5 s polling.
-- **P2 — Refresh-token rotation** for X.
-
-## Personas
-- **Founder operator** — weekly content + product demos without a marketing team.
-- **Solo developer / indie hacker** — Studio for demos, Social for build-in-public.
-
-## Env vars (final)
-- Required at runtime: `MONGO_URL`, `DB_NAME`.
-- AI: `EMERGENT_LLM_KEY` (fallback for everything) + `OPENAI_API_KEY` (user's; preferred for images) + optional `ANTHROPIC_API_KEY` (user's; preferred for Claude).
-- Auth: `APP_PASSWORD`, `JWT_SECRET`.
-- OAuth: `PUBLIC_BACKEND_URL`, `META_APP_ID`, `META_APP_SECRET`, `X_CLIENT_ID`, `X_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`.
-- Video: `FAL_API_KEY`.
+## Next action items
+- **P0 (user)**: Paste keys on Render (above). Push and redeploy.
+- **P1**: When R2 keys present + verify a video clip upload lands in your bucket.
+- **P1**: Connect Instagram/LinkedIn/X in Social → Brand · Identity once `*_CLIENT_ID/SECRET` are set.
+- **P2**: Wire AI provider preference UI so user can pick "always use my own key first".
+- **P2**: Memory UI panel for global pinned brand facts (already exists at `/workspace/memory`).
