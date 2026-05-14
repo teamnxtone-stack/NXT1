@@ -25,6 +25,8 @@ import WorkspaceOperations from "@/pages/workspace/WorkspaceOperations";
 import AgentOSDashboard from "@/pages/AgentOSDashboard";
 import AgentsPage from "@/pages/AgentsPage";
 import AgentOSPage from "@/pages/AgentOSPage";
+import SocialPage from "@/pages/workspace/SocialPage";
+import StudioPage from "@/pages/workspace/StudioPage";
 import { useAgentActivityWatcher } from "@/lib/agentActivity";
 import {
   WorkspaceDeployments,
@@ -100,6 +102,8 @@ function App() {
           <Route path="operations" element={<WorkspaceOperations />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="agentos" element={<AgentOSPage />} />
+          <Route path="social" element={<SocialPage />} />
+          <Route path="studio" element={<StudioPage />} />
         </Route>
         <Route
           path="/builder/:projectId"

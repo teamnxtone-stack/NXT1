@@ -351,4 +351,54 @@ export const runnerSelfHealUrl = (projectId) => {
   return `${API}/runner/projects/${projectId}/self-heal?auth=${t}`;
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+// Social Content Agent (2026-05-14)
+// ─────────────────────────────────────────────────────────────────────────
+export const socialGetProfile = () => api.get("/social/profile");
+export const socialSaveProfile = (payload) => api.post("/social/profile", payload);
+export const socialUploadLogo = (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.post("/social/profile/logo", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+export const socialGenerate = (payload) => api.post("/social/generate", payload);
+export const socialListJobs = (limit = 20) => api.get("/social/jobs", { params: { limit } });
+export const socialListPosts = (params = {}) => api.get("/social/posts", { params });
+export const socialGetPost = (id) => api.get(`/social/posts/${id}`);
+export const socialUpdatePost = (id, patch) => api.patch(`/social/posts/${id}`, patch);
+export const socialDeletePost = (id) => api.delete(`/social/posts/${id}`);
+export const socialRegeneratePost = (id) => api.post(`/social/posts/${id}/regenerate`);
+
+// ─────────────────────────────────────────────────────────────────────────
+// Video Studio (2026-05-14)
+// ─────────────────────────────────────────────────────────────────────────
+export const videoHealth = () => api.get("/video/health");
+export const videoGenerate = (payload) => api.post("/video/generate", payload);
+export const videoUpload = (file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api.post("/video/upload", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+export const videoListClips = () => api.get("/video/clips");
+export const videoDeleteClip = (id) => api.delete(`/video/clips/${id}`);
+export const videoListJobs = (limit = 20) => api.get("/video/jobs", { params: { limit } });
+export const videoSaveTimeline = (payload) => api.post("/video/timeline", payload);
+export const videoListTimelines = () => api.get("/video/timelines");
+export const videoGetTimeline = (id) => api.get(`/video/timeline/${id}`);
+export const videoPostToSocial = (payload) => api.post("/video/post-to-social", payload);
+
+// Generic jobs polling
+export const getJob = (jobId) => api.get(`/jobs/${jobId}`);
+
+// Absolute URL helper for media served by the backend
+export const mediaUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return path.startsWith("/api/") ? `${BACKEND_URL}${path}` : path;
+};
+
 export default api;

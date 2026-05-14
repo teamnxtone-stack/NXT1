@@ -71,6 +71,9 @@ from routes.hosting import router as hosting_router  # noqa: E402
 from routes.runner import router as runner_router  # noqa: E402
 # AgentOS v2 (Phase 22 — full dashboard redesign)
 from routes.agentos_v2 import router as agentos_v2_router  # noqa: E402
+# Social + Video Studio (2026-05-14)
+from routes.social import router as social_router  # noqa: E402
+from routes.video import router as video_router  # noqa: E402
 
 app = FastAPI(title="NXT1 API", version="0.6.0")
 
@@ -118,6 +121,8 @@ for r in (
     hosting_router,
     runner_router,
     agentos_v2_router,
+    social_router,
+    video_router,
 ):
     app.include_router(r)
 
