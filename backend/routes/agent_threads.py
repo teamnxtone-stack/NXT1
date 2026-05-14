@@ -204,6 +204,12 @@ async def create_run(thread_id: str, body: RunCreate, user_id: str = Depends(ver
             "last_run_id": run["id"], "status": "running", "updated_at": _now(),
         }, "$inc": {"run_count": 1}},
     )
+    # Phase G — actually execute the run in the background (durable worker).
+    try:
+        from services.agent_runs_worker import spawn_run
+        spawn_run(run["id"])
+    except Exception as e:
+        logger.warning(f"could not spawn agent run: {e}")
     return run
 
 
