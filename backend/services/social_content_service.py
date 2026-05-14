@@ -1,9 +1,10 @@
 """Social Content Agent — Claude (multimodal vision) + OpenAI gpt-image-1 (HQ).
 
 Key behaviors:
-  • Image gen uses the user's own OPENAI_API_KEY at top quality (gpt-image-1
-    quality="high"). Falls back to EMERGENT_LLM_KEY only if OPENAI_API_KEY
-    isn't set.
+  • Uses the user's own ANTHROPIC_API_KEY + OPENAI_API_KEY directly via
+    litellm / openai SDK — no proprietary helpers, no managed-key coupling.
+  • EMERGENT_LLM_KEY is supported transparently as a fallback proxy when the
+    user hasn't yet set their own keys (preview/dev environment).
   • Brief input is multimodal: optional reference image URLs feed both Claude
     (for tone/style understanding) AND OpenAI image gen (the descriptions
     derived from references are appended to image prompts).
@@ -22,8 +23,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+import litellm
+from openai import AsyncOpenAI
 from PIL import Image
 
 from services import agent_memory, job_service, asset_storage
@@ -41,32 +42,118 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _claude_key() -> str:
-    """Claude — use Anthropic key if present, else Emergent universal."""
-    key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        raise RuntimeError("No Claude key configured (set ANTHROPIC_API_KEY or EMERGENT_LLM_KEY)")
-    return key
+def _has_anthropic_key() -> bool:
+    return bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
 
 
-def _openai_key_for_images() -> str:
-    """Image gen prefers OPENAI_API_KEY (user's own) — best quality.
-
-    Falls back to EMERGENT_LLM_KEY for users without their own OpenAI account.
-    """
-    key = (os.environ.get("OPENAI_API_KEY") or "").strip()
-    if key:
-        return key
-    fallback = (os.environ.get("EMERGENT_LLM_KEY") or "").strip()
-    if not fallback:
-        raise RuntimeError(
-            "No OpenAI key for image gen. Set OPENAI_API_KEY (recommended) or EMERGENT_LLM_KEY."
-        )
-    return fallback
+def _has_openai_key() -> bool:
+    return bool((os.environ.get("OPENAI_API_KEY") or "").strip())
 
 
 def _is_user_openai_key() -> bool:
-    return bool((os.environ.get("OPENAI_API_KEY") or "").strip())
+    return _has_openai_key()
+
+
+def _emergent_proxy_base() -> Optional[str]:
+    """Return Emergent proxy /llm URL when a universal key is present."""
+    if not (os.environ.get("EMERGENT_LLM_KEY") or "").strip():
+        return None
+    base = (
+        os.environ.get("INTEGRATION_PROXY_URL")
+        or os.environ.get("integration_proxy_url")
+        or "https://integrations.emergentagent.com"
+    )
+    return base.rstrip("/") + "/llm"
+
+
+async def _claude_chat(
+    *,
+    system: str,
+    user_text: str,
+    model: str = "claude-sonnet-4-5-20250929",
+    image_b64_list: Optional[list[str]] = None,
+    max_tokens: int = 4096,
+) -> str:
+    """Call Claude with optional vision. Uses ANTHROPIC_API_KEY when set,
+    otherwise routes through the Emergent universal-key proxy.
+    """
+    user_content: list[dict] = [{"type": "text", "text": user_text}]
+    for b64 in (image_b64_list or [])[:3]:
+        # Detect mime from b64 magic header
+        if b64.startswith("/9j/"):
+            mime = "image/jpeg"
+        elif b64.startswith("R0lGOD"):
+            mime = "image/gif"
+        elif b64.startswith("UklGR"):
+            mime = "image/webp"
+        else:
+            mime = "image/png"
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,{b64}"},
+        })
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
+    anth_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    if anth_key:
+        resp = await litellm.acompletion(
+            model=f"anthropic/{model}",
+            api_key=anth_key,
+            messages=messages,
+            max_tokens=max_tokens,
+        )
+        return resp["choices"][0]["message"]["content"] or ""
+    # Fallback: Emergent universal-key proxy (OpenAI-compatible)
+    em_key = (os.environ.get("EMERGENT_LLM_KEY") or "").strip()
+    proxy = _emergent_proxy_base()
+    if not em_key or not proxy:
+        raise RuntimeError(
+            "Claude not configured. Set ANTHROPIC_API_KEY in your environment."
+        )
+    resp = await litellm.acompletion(
+        model=model,  # bare name — proxy figures it out
+        api_key=em_key,
+        api_base=proxy,
+        custom_llm_provider="openai",
+        messages=messages,
+        max_tokens=max_tokens,
+    )
+    return resp["choices"][0]["message"]["content"] or ""
+
+
+async def _openai_image(prompt: str, *, model: str = "gpt-image-1") -> Optional[bytes]:
+    """Generate one image via OpenAI gpt-image-1. Returns raw PNG bytes."""
+    oa_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if oa_key:
+        client = AsyncOpenAI(api_key=oa_key)
+    else:
+        em_key = (os.environ.get("EMERGENT_LLM_KEY") or "").strip()
+        proxy = _emergent_proxy_base()
+        if not em_key or not proxy:
+            raise RuntimeError(
+                "OpenAI image gen not configured. Set OPENAI_API_KEY in your environment."
+            )
+        client = AsyncOpenAI(api_key=em_key, base_url=proxy)
+    resp = await client.images.generate(
+        model=model,
+        prompt=prompt + " — photorealistic, high detail, professional photography, 4k",
+        n=1,
+        size="1024x1024",
+    )
+    if not resp.data:
+        return None
+    item = resp.data[0]
+    if getattr(item, "b64_json", None):
+        return base64.b64decode(item.b64_json)
+    if getattr(item, "url", None):
+        import httpx
+        async with httpx.AsyncClient(timeout=30) as http:
+            r = await http.get(item.url)
+            return r.content
+    return None
+
 
 
 PLATFORM_GUIDANCE = {
@@ -154,23 +241,20 @@ async def _generate_plan(
     instruction_parts.append("Output ONLY the JSON array.")
     instruction = "\n\n".join(instruction_parts)
 
-    chat = LlmChat(
-        api_key=_claude_key(),
-        session_id=f"social-plan-{uuid.uuid4()}",
-        system_message=sys,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-
-    msg_kwargs: dict = {"text": instruction}
+    # Collect reference images as base64 once for reuse
+    ref_b64_list: list[str] = []
     if reference_image_paths:
-        imgs = []
         for p in reference_image_paths[:3]:
             b64 = _load_image_b64(p)
             if b64:
-                imgs.append(ImageContent(image_base64=b64))
-        if imgs:
-            msg_kwargs["file_contents"] = imgs
+                ref_b64_list.append(b64)
 
-    resp = await chat.send_message(UserMessage(**msg_kwargs))
+    resp = await _claude_chat(
+        system=sys,
+        user_text=instruction,
+        image_b64_list=ref_b64_list or None,
+        max_tokens=4096,
+    )
     text = (resp or "").strip()
     if text.startswith("```"):
         text = text.strip("`")
@@ -197,20 +281,13 @@ async def _generate_plan(
 
     # Build a tiny visual-style summary from reference images via Claude vision
     visual_summary = ""
-    if reference_image_paths:
+    if ref_b64_list:
         try:
-            chat2 = LlmChat(
-                api_key=_claude_key(),
-                session_id=f"social-vision-{uuid.uuid4()}",
-                system_message="Describe the visual style (mood, palette, composition, subject) of these reference images in 2 sentences for use in DALL-E prompts. No preamble.",
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-            imgs = []
-            for p in reference_image_paths[:3]:
-                b64 = _load_image_b64(p)
-                if b64:
-                    imgs.append(ImageContent(image_base64=b64))
-            visual_summary = (await chat2.send_message(
-                UserMessage(text="Describe these references.", file_contents=imgs)
+            visual_summary = (await _claude_chat(
+                system="Describe the visual style (mood, palette, composition, subject) of these reference images in 2 sentences for use in DALL-E prompts. No preamble.",
+                user_text="Describe these references.",
+                image_b64_list=ref_b64_list,
+                max_tokens=400,
             )).strip()[:400]
         except Exception as e:
             logger.warning(f"visual summary failed: {e}")
@@ -241,20 +318,9 @@ def _overlay_logo(image_bytes: bytes, logo_path: Optional[str]) -> bytes:
 async def _generate_image(prompt: str, logo_path: Optional[str]) -> Optional[str]:
     """Generate one HIGH-quality image via OpenAI gpt-image-1. Save and return URL."""
     try:
-        img_gen = OpenAIImageGeneration(api_key=_openai_key_for_images())
-        # gpt-image-1 supports quality="high" (best) and size up to 1536x1536
-        images = await img_gen.generate_images(
-            prompt=prompt + " — photorealistic, high detail, professional photography, 4k",
-            model="gpt-image-1",
-            number_of_images=1,
-        )
-        if not images:
+        raw = await _openai_image(prompt, model="gpt-image-1")
+        if not raw:
             return None
-        raw = images[0]
-        if isinstance(raw, dict) and "image_base64" in raw:
-            raw = base64.b64decode(raw["image_base64"])
-        elif isinstance(raw, str):
-            raw = base64.b64decode(raw)
         final = _overlay_logo(raw, logo_path)
         fn = f"{uuid.uuid4().hex}.png"
         # Storage facade: R2 if configured, else local disk
@@ -309,7 +375,7 @@ async def run_social_job(
             reference_image_paths=reference_image_paths,
         )
 
-        key_kind = "your OpenAI key" if _is_user_openai_key() else "Emergent universal key"
+        key_kind = "your OpenAI key" if _is_user_openai_key() else "fallback proxy"
         await job_service.append_log(
             db, job_id, "info",
             f"Plan ready ({len(plan)} entries). Generating HQ images via gpt-image-1 ({key_kind})…",
@@ -409,12 +475,11 @@ async def regenerate_post(db, post_id: str, user_id: str) -> dict:
         f"Regenerate this post (platform={post['platform']}, topic='{post.get('topic','')}').\n"
         f"Previous caption: {post.get('caption','')[:300]}\nOutput JSON only."
     )
-    chat = LlmChat(
-        api_key=_claude_key(),
-        session_id=f"regen-{uuid.uuid4()}",
-        system_message=sys,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-    text = (await chat.send_message(UserMessage(text="\n\n".join(parts)))).strip()
+    text = (await _claude_chat(
+        system=sys,
+        user_text="\n\n".join(parts),
+        max_tokens=1500,
+    )).strip()
     if text.startswith("```"):
         text = text.strip("`")
         if text.lower().startswith("json"):
