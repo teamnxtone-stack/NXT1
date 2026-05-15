@@ -1,3 +1,36 @@
+## 2026-05-15 — Full bolt.diy builder migration (replaces native builder)
+
+### What shipped
+- Native builder UI (`ChatPanel`, `PreviewPanel`, `FileExplorer`, `BoltDiyOverlay`, …) **deleted**. Only `SheetOverlay.jsx` remains in `/app/frontend/src/components/builder/` (used by `SettingsSheet`).
+- New `BuilderPage.jsx` is a single fullscreen iframe pointing at `/api/bolt-engine/` with `credentialless="true"` so the WebContainer can boot inside it without the parent page needing cross-origin-isolation.
+- New `routes/bolt_proxy.py` reverse-proxies `/api/bolt-engine/{path}` → `http://127.0.0.1:5173/api/bolt-engine/{path}`. Forces `Cross-Origin-Embedder-Policy: credentialless` + `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Resource-Policy: cross-origin` on every response so WebContainers boot through the public ingress even when CF strips bolt's own headers.
+- Uses `httpx.AsyncClient.send(req, stream=True)` (the previous `client.request(...)` then `aiter_raw()` was the StreamConsumed bug surfaced in the handoff).
+
+### bolt.diy sidecar changes (in `/app/services/bolt-engine/`)
+- `vite.config.ts` — added `base: '/api/bolt-engine/'`, `remixVitePlugin({ basename: '/api/bolt-engine/' })`, and `server.hmr: false` (proxy doesn't tunnel WebSockets).
+- `app/entry.client.tsx` — installs a global `window.fetch` interceptor that rewrites any same-origin URL starting with `/api/…` (other than already-prefixed `/api/bolt-engine/…`) to live under `/api/bolt-engine`. Without this every bolt-internal API call leaked into NXT1's FastAPI backend.
+- `app/lib/stores/theme.ts` — `DEFAULT_THEME = 'dark'`.
+- `app/root.tsx` — inline theme script defaults to `'dark'` instead of OS preference; favicon points at `/api/bolt-engine/favicon.svg`.
+- `app/components/header/Header.tsx` — logo points at `/api/bolt-engine/logo.svg`.
+- `app/styles/variables.scss` — dark-theme palette overridden: `--bolt-elements-bg-depth-1: #0F1117`, `--bolt-elements-bg-depth-2: #1A1D27`, `--bolt-elements-bg-depth-3: #232634`. Accent stays at `#3B82F6` (already `colors.accent.500` in `uno.config.ts`).
+- `public/favicon.svg` + `public/logo.svg` — replaced with NXT1-branded SVGs (NXT badge + BUILDER wordmark).
+
+### Verified via testing agent (iter9, 15/15 backend tests + Playwright)
+- COEP/COOP headers survive the public Cloudflare ingress.
+- Iframe boots end-to-end: `data-theme="dark"`, body bg = `rgb(15, 17, 23)`, NXT1 logo top-left, "Where ideas begin" welcome screen renders.
+- Zero 5xx from NXT1 backend during the run.
+- Regression-clean across `/workspace`, `/workspace/social`, `/workspace/studio`, `/workspace/memory`, `/workspace/leads`, public landing + chat bubble.
+
+### Known cosmetic warnings (LOW; tracked but not blocking)
+- Bolt's `fetchConfiguredProviders()` → 404 (its remix /api/* routes aren't all reachable through the proxy). Renders fine; user can still enter an API key via the UI.
+- HMR ws probe shows two 403s per iframe load even with `hmr:false`. No functional impact.
+- Pre-existing nested-button hydration warning in `NotificationCenter` (unrelated to this migration).
+
+### Operational note
+The bolt-engine supervisor entry can race when restarted — the parent `pnpm` exits but child `remix vite:dev` survives and holds port 5173, so the next start lands on 5174/5175 and the proxy 502s. Recovery: `sudo supervisorctl stop bolt-engine && pkill -9 -f "remix vite" && pkill -9 -f workerd && pkill -9 -f esbuild && sudo supervisorctl start bolt-engine`.
+
+
+
 ## 2026-05-15 — Platform polish pass (Phase H)
 
 ### Conversational chat gate (most critical fix)
