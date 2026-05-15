@@ -29,7 +29,6 @@ import Brand from "@/components/Brand";
 import GradientBackdrop from "@/components/GradientBackdrop";
 import ModelPickerCockpit from "@/components/premium/ModelPickerCockpit";
 import LandingShowcase from "@/components/landing/LandingShowcase";
-import NxtChatBot from "@/components/landing/NxtChatBot";
 import HomepageDemos from "@/components/landing/HomepageDemos";
 import PromptToDeployFlow from "@/components/landing/PromptToDeployFlow";
 import ThemeSwitcher from "@/components/theme/ThemeSwitcher";
@@ -647,10 +646,6 @@ export default function LandingPage() {
       <div id="showcase" className="scroll-mt-20">
         <LandingShowcase />
       </div>
-
-      {/* Talk to NXT — Claude-powered public chatbot, replaces the legacy
-          contact form. */}
-      <NxtChatBot />
 
 
       {/* Quiet footer — Brand · routes · Made in the USA */}

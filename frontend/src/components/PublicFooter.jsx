@@ -14,10 +14,9 @@ export default function PublicFooter() {
       data-testid="public-footer"
     >
       <div
-        className="mx-auto max-w-[920px] flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]"
+        className="mx-auto max-w-[920px] flex flex-col sm:flex-row items-center justify-end gap-3 text-[11px]"
         style={{ color: "var(--nxt-fg-faint)" }}
       >
-        <span className="mono tracking-[0.20em] uppercase">NXT1</span>
         <div className="flex items-center gap-4 sm:gap-5">
           <Link to="/privacy" className="transition-colors" style={{ color: "inherit" }} data-testid="footer-privacy">Privacy</Link>
           <Link to="/terms"   className="transition-colors" style={{ color: "inherit" }} data-testid="footer-terms">Terms</Link>
