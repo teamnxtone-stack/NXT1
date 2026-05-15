@@ -28,6 +28,7 @@ import AgentOSPage from "@/pages/AgentOSPage";
 import SocialPage from "@/pages/workspace/SocialPage";
 import StudioPage from "@/pages/workspace/StudioPage";
 import MemoryPage from "@/pages/workspace/MemoryPage";
+import LeadsPage from "@/pages/workspace/LeadsPage";
 import { useAgentActivityWatcher } from "@/lib/agentActivity";
 import {
   WorkspaceDeployments,
@@ -36,6 +37,7 @@ import {
   WorkspaceSettings,
   WorkspaceEditor,
 } from "@/pages/workspace/WorkspaceModules";
+import PublicChatBubble from "@/components/landing/PublicChatBubble";
 import "@/App.css";
 
 function App() {
@@ -44,6 +46,7 @@ function App() {
     <ThemeProvider>
     <BrowserRouter>
       <ThemedToaster />
+      <PublicChatBubble />
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
@@ -106,6 +109,7 @@ function App() {
           <Route path="social" element={<SocialPage />} />
           <Route path="studio" element={<StudioPage />} />
           <Route path="memory" element={<MemoryPage />} />
+          <Route path="leads" element={<LeadsPage />} />
         </Route>
         <Route
           path="/builder/:projectId"

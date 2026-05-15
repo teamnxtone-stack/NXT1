@@ -107,6 +107,9 @@ class ChatIn(BaseModel):
 
 class LeadIn(BaseModel):
     email: EmailStr
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    phone: Optional[str] = ""
     note: Optional[str] = ""
     session_id: Optional[str] = None
     source: Optional[str] = "nxt-chat"
@@ -218,6 +221,9 @@ async def chat_lead(body: LeadIn, request: Request):
     doc = {
         "id": str(uuid.uuid4()),
         "email": str(body.email).lower(),
+        "first_name": (body.first_name or "")[:80],
+        "last_name": (body.last_name or "")[:80],
+        "phone": (body.phone or "")[:40],
         "note": (body.note or "")[:1000],
         "session_id": body.session_id,
         "source": body.source or "nxt-chat",
@@ -230,3 +236,45 @@ async def chat_lead(body: LeadIn, request: Request):
         logger.warning(f"lead save failed: {e}")
     doc.pop("_id", None)
     return {"ok": True, "id": doc["id"]}
+
+
+
+# ─── Admin (auth-gated) lead browser ───────────────────────────────────
+# Lives under /api/admin so only signed-in workspace users can hit it.
+from fastapi import Depends  # noqa: E402
+from ._deps import verify_token  # noqa: E402
+
+admin_router = APIRouter(prefix="/api/admin/nxt-chat", tags=["admin-nxt-chat"])
+
+
+@admin_router.get("/leads")
+async def list_leads(_: str = Depends(verify_token), limit: int = 100, q: str = ""):
+    """List recent chat leads. Optional ?q= filters email/name/note."""
+    query: dict = {}
+    if q:
+        # Mongo case-insensitive contains via regex
+        rx = {"$regex": q.strip()[:100], "$options": "i"}
+        query["$or"] = [
+            {"email": rx}, {"first_name": rx}, {"last_name": rx},
+            {"note": rx}, {"phone": rx},
+        ]
+    cur = _db.public_chat_leads.find(query, {"_id": 0}).sort("created_at", -1).limit(min(limit, 500))
+    items = await cur.to_list(length=None)
+    total = await _db.public_chat_leads.count_documents({})
+    return {"items": items, "count": len(items), "total": total}
+
+
+@admin_router.get("/leads/{lead_id}/transcript")
+async def lead_transcript(lead_id: str, _: str = Depends(verify_token)):
+    """Return the full chat transcript for the session the lead came from."""
+    lead = await _db.public_chat_leads.find_one({"id": lead_id}, {"_id": 0})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    transcript: list[dict] = []
+    sid = lead.get("session_id")
+    if sid:
+        cur = _db.public_chat_messages.find(
+            {"session_id": sid}, {"_id": 0, "role": 1, "content": 1, "ts": 1},
+        ).sort("ts", 1).limit(200)
+        transcript = await cur.to_list(length=None)
+    return {"lead": lead, "transcript": transcript}

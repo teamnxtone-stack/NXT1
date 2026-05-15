@@ -30,6 +30,7 @@ import {
   Megaphone,
   Film,
   Brain,
+  MessageSquare,
 } from "lucide-react";
 import Brand from "@/components/Brand";
 import { clearToken } from "@/lib/auth";
@@ -109,6 +110,7 @@ function HamburgerDrawer({ onClose }) {
     { id: "social",   label: "Social",   icon: Megaphone,    onClick: () => go("/workspace/social") },
     { id: "studio",   label: "Studio",   icon: Film,         onClick: () => go("/workspace/studio") },
     { id: "memory",   label: "Memory",   icon: Brain,        onClick: () => go("/workspace/memory") },
+    { id: "leads",    label: "Leads",    icon: MessageSquare, onClick: () => go("/workspace/leads") },
     { id: "agents",   label: "Agents",   icon: SparklesIcon, onClick: () => go("/workspace/agents") },
     { id: "agentos",  label: "AgentOS",  icon: Bot,          onClick: () => go("/agentos") },
     { id: "account",  label: "Account",  icon: User,         onClick: () => go("/workspace/account") },
