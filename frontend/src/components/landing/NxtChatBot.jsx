@@ -278,7 +278,7 @@ function ChatCard({ inline = false, compact = false }) {
             </h2>
             <p className="mt-3 text-[13.5px] sm:text-[14.5px] leading-relaxed max-w-[480px] mx-auto"
                style={{ color: "var(--nxt-fg-dim)" }}>
-              Powered by Claude. Real conversation — no contact form.
+              Real conversation — no contact form. Ask about access, what we build, or anything else.
             </p>
           </div>
         )}
@@ -304,7 +304,7 @@ function ChatCard({ inline = false, compact = false }) {
             </span>
             <span className="ml-auto mono text-[10px] tracking-[0.22em] uppercase"
                   style={{ color: "var(--nxt-fg-faint)" }}>
-              Claude · live
+              Live
             </span>
           </div>
 
