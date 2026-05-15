@@ -1,0 +1,48 @@
+{
+  "summary": "Iter9 — Verified bolt.diy builder migration regression. Backend: 15/15 NEW tests PASS in /app/backend/tests/test_iter9_bolt_migration.py covering bolt-proxy COEP/COOP, HTML payload + asset prefix rewrite, logo/favicon, notifications, social/posts, social/oauth/status, memory, leads (admin + authed user), public landing, system health, agentos builder/status — zero 5xx. Frontend (Playwright on preview URL): landing renders with floating chat bubble bottom-right, /signin works with test@nxt1.local/testpass123 storing nxt1.token, /builder/{id} renders header ('Workspace' back link + 'NXT1 · BUILDER' wordmark) and iframe[data-testid=builder-iframe] with src=/api/bolt-engine/?project=... — the iframe's bolt.diy app fully boots: data-theme='dark', body bg=rgb(15,17,23) (#0F1117), title='NXT One Builder', NXT1 logo SVG visible top-left, 'Where ideas begin' welcome screen rendered, all bolt assets served under /api/bolt-engine/ prefix. /workspace, /workspace/social, /workspace/studio, /workspace/memory, /workspace/leads all load with no visible error banners; bell[data-testid=notification-bell] mounts and panel opens showing 3 notifications. All review-request bullets are GREEN.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NotificationCenter", "issue": "Hydration warning: <button> nested inside another <button> (notification-item button contains a 'Mark as read' inner button at line ~201). Functional but produces a React hydration console error on every /workspace mount. Fix by making the inner control a non-button element (e.g. <span role='button'> + onClick stopPropagation) or restructuring the row so the outer wrapper is a <div> with onClick.", "selector": "[data-testid^='notification-item-'] > button[aria-label='Mark as read']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Bolt iframe — provider config fetch", "issue": "Inside the bolt iframe, fetchConfiguredProviders() (app/lib/stores/settings.ts:41) issues a request that the entry.client.tsx fetch interceptor rewrites to /api/bolt-engine/api/... which the FastAPI proxy returns 404 for (bolt's own remix /api routes are not all reachable via the reverse proxy). Cosmetic only — bolt's welcome screen renders fine and the user can still set an API key via the UI — but it logs a red 'Error fetching configured providers: HTTP 404' on every iframe mount. Either expose those bolt-internal /api/* routes through the proxy or swallow the 404 in fetchConfiguredProviders.", "affected_selectors": ["[data-testid='builder-iframe']"]},
+      {"flow": "Bolt iframe — Vite HMR websocket", "issue": "Bolt still attempts to open wss://.../api/bolt-engine/?token=... for Vite HMR (handshake → 403 via ingress) and a fallback wss://localhost:5173/... (SSL error). Expected because vite.config.ts has hmr:false, but the dev client probe is still wired. Two red console errors per mount. No functional impact. To silence, set server.hmr.clientPort=null or remove the HMR client entry in the prod-mode build.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter9_bolt_migration.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [
+    "(Low) Fix nested-button hydration warning in /app/frontend/src/components/NotificationCenter (around line 201) — wrap outer row as <div role='button'> instead of <button>.",
+    "(Low) Either expose bolt's internal /api/* (e.g. /api/system/providers) through the FastAPI reverse proxy, or guard fetchConfiguredProviders() in /app/services/bolt-engine/app/lib/stores/settings.ts so a 404 doesn't surface as a red console error.",
+    "(Low) Silence the Vite HMR websocket probe inside the bolt-engine sidecar (server.hmr=false fully, or remove the HMR client) — currently produces two red console errors per iframe mount with no functional impact.",
+    "(Doc) Review request mentions /api/leads or /api/v1/leads but the actual route is /api/v1/agentos/leads. Update the request or add an alias for clarity."
+  ],
+  "critical_code_review_comments": [
+    "BOLT PROXY HEADERS — VERIFIED. GET /api/bolt-engine/ returns Cross-Origin-Embedder-Policy: credentialless + Cross-Origin-Opener-Policy: same-origin + Cross-Origin-Resource-Policy: cross-origin on the HTML payload. These are the prerequisite for WebContainers (SharedArrayBuffer) inside the iframe. Verified through external ingress (cloudflare) — confirms ingress does NOT strip them.",
+    "BOLT PROXY STREAM FIX — VERIFIED. The previously-broken httpx StreamConsumed pattern is gone; the new client.send(req, stream=True) + aiter_raw() path works end-to-end (the welcome screen + all assets load including .scss/.css/.js modules + logo.svg + favicon.svg).",
+    "BOLT BASE PATH REWRITE — VERIFIED. All asset hrefs in the served HTML are correctly rewritten to /api/bolt-engine/... (verified: react-toastify css, unocss reset, app/styles/index.scss, xterm.css all served under the prefix). No bare /node_modules or /app paths leaking into the parent NXT1 frontend.",
+    "BOLT DARK THEME — VERIFIED. document.documentElement.getAttribute('data-theme') === 'dark', body bg === rgb(15,17,23) (matches --bolt-elements-bg-depth-1: #0F1117 from variables.scss). DEFAULT_THEME='dark' from theme.ts is taking effect at first paint.",
+    "BOLT BRANDING — VERIFIED. Title rewritten to 'NXT One Builder', top-left logo is the NXT1 SVG (not the original bolt.diy logo), and the BuilderPage shell shows 'NXT1 · BUILDER' next to the back-to-Workspace link.",
+    "WEBCONTAINER BOOT — NOT TESTED (out of scope). The 'no LLM API key' state ('Not Set (Please set via UI or ENV_VAR)') is shown correctly and is expected — main agent flagged this.",
+    "WORKSPACE PAGES REGRESSION — VERIFIED. /workspace (home), /workspace/social, /workspace/studio, /workspace/memory, /workspace/leads all render with 200 OK and no visible error banners. NotificationCenter mounts and the bell-click panel opens showing 3 notifications (verified visually).",
+    "PUBLIC LANDING & CHAT BUBBLE — VERIFIED. / renders, floating chat bubble visible bottom-right (button[aria-label*='chat']). PublicChatBubble component is mounted at the App level.",
+    "BACKEND APIS — VERIFIED ZERO 5xx. /api/notifications/list, /api/social/posts, /api/social/oauth/status, /api/memory, /api/v1/agentos/leads, /api/system/health, /api/v1/agentos/builder/status, /api/users/signin, /api/auth/login all return 200 (or <500 for endpoints requiring different auth scopes).",
+    "AUTH NOTE — Both auth paths work: POST /api/users/signin (test@nxt1.local/testpass123 → JWT stored as nxt1.token) and POST /api/auth/login (password 555 → legacy admin gate JWT). Both used in tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter9_bolt_migration.py",
+    "/app/test_reports/pytest/iter9_results.xml",
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% on review-request critical bullets; 3 console-warning level issues flagged"},
+  "test_credentials": "POST /api/users/signin {email:test@nxt1.local, password:testpass123} → JWT stored as localStorage.nxt1.token. POST /api/auth/login {password:'555'} → legacy admin gate JWT.",
+  "seed_data_creation": "None. All tests are read-only against existing seed data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run iter9 with: `cd /app/backend && python3 -m pytest tests/test_iter9_bolt_migration.py -v -o addopts=''` (~2.5s, 15 tests, all PASS). The bolt iframe takes 10-15s to fully boot inside Playwright — use page.wait_for_timeout(15000) after navigating to /builder/{id} before inspecting frame contents. Find the bolt frame by URL match: `next((f for f in page.frames if '/api/bolt-engine/' in (f.url or '')), None)`. Two harmless console errors are expected from the bolt iframe (Vite HMR ws + fetchConfiguredProviders 404) — they are pre-existing and tracked in action_items, don't treat as regressions. Supervisor 'frontend' status reports FATAL because of failed restarts (port 3000 already in use by the still-alive original process) — the frontend is actually running fine; don't restart it.",
+  "rca of the issue": "No bugs found in scope. The two iframe console errors (HMR ws 403 + provider-config 404) are by design of the proxy + hmr:false config and don't break the iframe boot. The NotificationCenter nested-button hydration warning is a pre-existing minor issue unrelated to the bolt migration."
+}

@@ -1,14 +1,14 @@
-"""Reverse-proxy /bolt/* requests to the local bolt.diy service.
+"""Reverse-proxy /api/bolt-engine/* requests to the local bolt.diy service.
 
 bolt.diy runs on port 5173 (managed by supervisor at
 `/etc/supervisor/conf.d/bolt-engine.conf`). We expose it to the public
-under `/bolt/...` so the frontend iframe at `/builder/{id}` can load it
-without users needing to know about the internal port.
+under `/api/bolt-engine/...` so the frontend iframe at `/builder/{id}`
+can load it without users needing to know about the internal port.
 
 CRITICAL: WebContainers (StackBlitz tech bolt.diy uses for the live
-preview) require COOP/COEP isolation. We forward those headers from
-bolt.diy unchanged, and set COEP=credentialless on our own document so
-the cross-origin-isolated iframe can boot.
+preview) require COOP/COEP isolation. We force `credentialless` COEP +
+`same-origin` COOP on every response so the cross-origin-isolated iframe
+can boot even if the public ingress strips bolt.diy's own headers.
 """
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ router = APIRouter(prefix="/api/bolt-engine", tags=["bolt-engine"])
 BOLT_INTERNAL_URL = (
     os.environ.get("BOLT_ENGINE_INTERNAL_URL")
     or os.environ.get("BOLT_DIY_URL")
-    or "http://localhost:5173"
-)
+    or "http://127.0.0.1:5173"
+).rstrip("/")
 
 # Headers we strip from the inbound request before forwarding to bolt.diy
 _STRIP_REQ = {"host", "content-length", "x-forwarded-host", "x-forwarded-proto"}
@@ -48,7 +48,11 @@ _STRIP_RES = {
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
 )
 async def bolt_proxy(request: Request, path: Optional[str] = ""):
-    target = f"{BOLT_INTERNAL_URL}/{path or ''}"
+    # We keep the `/api/bolt-engine/` prefix when forwarding because the
+    # bolt.diy Vite/Remix dev server is configured with `base` + `basename`
+    # of `/api/bolt-engine/` (so its emitted HTML/asset/HMR paths match
+    # the public-facing URL it lives behind).
+    target = f"{BOLT_INTERNAL_URL}/api/bolt-engine/{path or ''}"
     if request.url.query:
         target = f"{target}?{request.url.query}"
 
@@ -61,13 +65,15 @@ async def bolt_proxy(request: Request, path: Optional[str] = ""):
 
     timeout = httpx.Timeout(60.0, connect=10.0)
     client = httpx.AsyncClient(timeout=timeout, follow_redirects=False)
+
     try:
-        upstream = await client.request(
+        req = client.build_request(
             request.method,
             target,
             headers=fwd_headers,
             content=body,
         )
+        upstream = await client.send(req, stream=True)
     except httpx.RequestError as e:
         await client.aclose()
         return Response(
