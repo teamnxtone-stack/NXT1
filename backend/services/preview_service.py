@@ -27,15 +27,34 @@ def _new_slug(seed: Optional[str] = None) -> str:
 
 
 def public_origin() -> str:
-    """Where preview URLs are rooted. Falls back to the preview env if unset."""
+    """Where preview URLs are rooted. Falls back to the platform default.
+
+    Resolution order:
+      1. PREVIEW_PUBLIC_ORIGIN env (explicit override)
+      2. BACKEND_PUBLIC_ORIGIN env (legacy)
+      3. NXT One default: https://nxtone.ai
+    Emergent-managed hostnames are never used here.
+    """
     return (
         os.environ.get("PREVIEW_PUBLIC_ORIGIN")
         or os.environ.get("BACKEND_PUBLIC_ORIGIN")
-        or "https://nxtone.tech"
+        or "https://nxtone.ai"
     ).rstrip("/")
 
 
-def build_url(slug: str) -> str:
+def build_url(slug: str, *, custom_host: Optional[str] = None) -> str:
+    """Build the public preview URL for a slug. When `custom_host` is provided
+    (e.g. `preview.project.nxtone.ai` or `demo.clientdomain.com`), serve from
+    there instead of the platform origin."""
+    if custom_host:
+        host = custom_host.strip()
+        # Strip scheme prefixes correctly (lstrip() strips chars, not a prefix).
+        for scheme in ("https://", "http://"):
+            if host.lower().startswith(scheme):
+                host = host[len(scheme):]
+                break
+        host = host.rstrip("/")
+        return f"https://{host}/p/{slug}"
     return f"{public_origin()}/p/{slug}"
 
 
@@ -43,12 +62,13 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def make_initial(project_name: str) -> dict:
+def make_initial(project_name: str, *, custom_host: Optional[str] = None) -> dict:
     slug = _new_slug(project_name)
     ts = now()
     return {
         "slug": slug,
-        "url": build_url(slug),
+        "url": build_url(slug, custom_host=custom_host),
+        "custom_host": custom_host,
         "created_at": ts,
         "updated_at": ts,
         "build_count": 1,
@@ -58,14 +78,18 @@ def make_initial(project_name: str) -> dict:
     }
 
 
-def refresh(existing: dict) -> dict:
-    """Bump the build count + updated_at, keep the slug stable."""
+def refresh(existing: dict, *, custom_host: Optional[str] = None) -> dict:
+    """Bump the build count + updated_at, keep the slug stable. Optionally
+    re-issue the URL against a new custom host (e.g. the user just connected
+    `preview.client.com` to this project)."""
     rec = dict(existing or {})
     rec["updated_at"] = now()
     rec["build_count"] = int(rec.get("build_count") or 0) + 1
-    # If somehow URL was stored against an old origin, refresh it too.
+    host = custom_host if custom_host is not None else rec.get("custom_host")
     if rec.get("slug"):
-        rec["url"] = build_url(rec["slug"])
+        rec["url"] = build_url(rec["slug"], custom_host=host)
+    if custom_host is not None:
+        rec["custom_host"] = custom_host
     return rec
 
 

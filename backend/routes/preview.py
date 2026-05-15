@@ -35,6 +35,7 @@ router = APIRouter(prefix="/api", tags=["preview"])
 class PreviewIn(BaseModel):
     public: Optional[bool] = True
     password: Optional[str] = None  # set to "" to clear, anything else to set
+    custom_host: Optional[str] = None  # e.g. "preview.client.com" — strips emergent/default
 
 
 class PreviewUnlockIn(BaseModel):
@@ -80,10 +81,18 @@ async def create_or_refresh_preview(project_id: str, body: Optional[PreviewIn] =
     if not files:
         raise HTTPException(status_code=400, detail="Build the project before generating a preview link")
     existing = doc.get("preview") or {}
+    new_host: Optional[str] = None
+    if body and body.custom_host is not None:
+        nh = body.custom_host.strip()
+        for scheme in ("https://", "http://"):
+            if nh.lower().startswith(scheme):
+                nh = nh[len(scheme):]
+                break
+        new_host = nh.rstrip("/") or None
     if existing.get("slug"):
-        rec = preview_service.refresh(existing)
+        rec = preview_service.refresh(existing, custom_host=new_host if (body and body.custom_host is not None) else None)
     else:
-        rec = preview_service.make_initial(doc.get("name") or project_id)
+        rec = preview_service.make_initial(doc.get("name") or project_id, custom_host=new_host)
     if body and body.public is not None:
         rec["public"] = bool(body.public)
     if body and body.password is not None:

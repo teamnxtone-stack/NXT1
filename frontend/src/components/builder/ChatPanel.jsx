@@ -5,6 +5,7 @@ import {
   User,
   RefreshCw,
   Paperclip,
+  Image as ImageIcon,
   Eye,
   Rocket,
   Sparkles,
@@ -83,6 +84,7 @@ export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdate
     try { localStorage.setItem(`nxt1-proto:${projectId}`, v); } catch { /* ignore */ }
   };
   const fileInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -275,27 +277,49 @@ export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdate
             setCurrentJobId(ev.job_id);
             refreshActiveJobs();
           } else if (ev.type === "start") {
-            setReceipts([]);
-            setNarration([]);
-            setCurrentPhase("Starting…");
-            fileActivity.reset();
-            liveSyncReset();
+            // Conversational `start` carries mode:"chat" — keep the
+            // assistant bubble streaming a plain reply, skip build-stage UI.
+            if (ev.mode === "chat") {
+              setMessages((m) => [
+                ...m.filter((x) => x.id !== optimistic.id),
+                { id: "assistant-stream", role: "assistant", content: "", streaming: true, mode: "chat" },
+              ]);
+            } else {
+              setReceipts([]);
+              setNarration([]);
+              setCurrentPhase("Starting…");
+              fileActivity.reset();
+              liveSyncReset();
+            }
           } else if (ev.type === "phase") {
             setCurrentPhase(ev.label);
-            // The backend may attach inference payload to the phase event when
-            // it's the "Inferring foundation" / "Foundation loaded" phase.
             if (ev.inference) {
               setInference(ev.inference);
             }
           } else if (ev.type === "narration") {
-            // Live first-person prose from the narrator agent
             setNarration((n) => [
               ...n,
               { id: `n-${Date.now()}-${n.length}`, line: ev.line },
             ]);
           } else if (ev.type === "chunk") {
-            lastSize = ev.size;
-            setStreamSize(ev.size);
+            // Conversational chunks carry `delta` (string). Build chunks
+            // carry `size` (number). Append delta to the streaming assistant bubble.
+            if (typeof ev.delta === "string") {
+              setMessages((m) =>
+                m.map((x) => (x.id === "assistant-stream"
+                  ? { ...x, content: (x.content || "") + ev.delta }
+                  : x))
+              );
+            } else if (typeof ev.size === "number") {
+              lastSize = ev.size;
+              setStreamSize(ev.size);
+            }
+          } else if (ev.type === "complete" && ev.message) {
+            // Conversational reply finalised — swap streaming bubble with persisted msg.
+            setMessages((m) => [
+              ...m.filter((x) => x.id !== "assistant-stream"),
+              ev.message,
+            ]);
           } else if (ev.type === "tag_chunk") {
             // Tag-mode: a file is being written live. Mark it active in the
             // file-activity bus so the explorer can show a writing pulse.
@@ -723,24 +747,45 @@ export default function ChatPanel({ projectId, initialPrompt = "", onFilesUpdate
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,.pdf,.csv,.json,.txt,.md,.zip"
+            accept="video/*,.pdf,.doc,.docx,.csv,.json,.txt,.md,.rtf,.xls,.xlsx,.ppt,.pptx,.zip"
             className="hidden"
             onChange={(e) => handleUploadFiles(e.target.files)}
             data-testid="chat-file-input"
           />
+          <input
+            ref={photoInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleUploadFiles(e.target.files)}
+            data-testid="chat-photo-input"
+          />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploading || streaming}
+            className="h-10 w-10 sm:h-9 sm:w-9 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white transition disabled:opacity-50 shrink-0"
+            title="Add photos"
+            data-testid="chat-photo-button"
+            aria-label="Add photos"
+          >
+            {uploading ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <ImageIcon size={15} />
+            )}
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || streaming}
             className="h-10 w-10 sm:h-9 sm:w-9 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white transition disabled:opacity-50 shrink-0"
-            title="Upload files"
+            title="Attach files (videos, PDFs, docs)"
             data-testid="chat-upload-button"
+            aria-label="Attach files"
           >
-            {uploading ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <Paperclip size={15} />
-            )}
+            <Paperclip size={15} />
           </button>
           {/* Expandable actions: Save to GitHub / Deploy / Preview / Export.
               Hidden until tapped, never permanently above the chat.

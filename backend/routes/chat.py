@@ -30,6 +30,70 @@ logger = logging.getLogger("nxt1.chat")
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
+# ─── Conversational gate ────────────────────────────────────────────────
+# Stops the build pipeline from firing on greetings, questions, or unclear
+# intent. Returns True only when the message looks like an actual build /
+# edit instruction. Errs on the side of "conversation first, build later".
+_BUILD_VERBS = (
+    "build", "create", "make", "generate", "scaffold", "design", "code",
+    "implement", "add", "wire up", "wire", "set up", "setup", "ship",
+    "deploy", "remove", "delete", "fix", "rename", "refactor", "convert",
+    "turn into", "redesign", "revamp", "edit", "update", "change", "rewrite",
+    "replace", "swap", "extract", "split", "merge", "migrate", "port",
+    "improve", "polish", "tighten", "simplify", "rebuild", "regenerate",
+    "add a", "add an", "add the", "make the", "make a", "make it",
+    "give me", "build me", "create me",
+)
+_GREETING_PATTERNS = (
+    "hi", "hello", "hey", "yo", "sup", "hola", "howdy",
+    "good morning", "good afternoon", "good evening", "gm", "ga", "ge",
+    "thanks", "thank you", "thx", "ty", "ok", "okay", "cool", "nice",
+    "great", "awesome", "what's up", "whats up",
+)
+_QUESTION_HINTS = ("?", "can you", "could you", "would you", "do you", "are you",
+                   "what is", "what's", "how do", "how does", "why ", "when ",
+                   "where ", "who ", "tell me about", "explain")
+
+
+def classify_intent(message: str, has_prior_messages: bool = False) -> dict:
+    """Light-weight intent classifier. Returns {intent, confidence, reason}.
+
+    intent ∈ {"build", "edit", "chat", "ambiguous"}.
+
+    We deliberately do NOT call an LLM here — the classifier is fast,
+    deterministic, and reliable for the obvious cases. Genuinely ambiguous
+    inputs fall through to "chat" so the assistant responds first.
+    """
+    raw = (message or "").strip()
+    if not raw:
+        return {"intent": "chat", "confidence": 1.0, "reason": "empty"}
+    lower = raw.lower()
+    word_count = len(raw.split())
+    # 1. Pure greeting / single-word ack: always chat.
+    if word_count <= 3 and any(lower == g or lower.startswith(g + " ") or lower.startswith(g + "!") for g in _GREETING_PATTERNS):
+        return {"intent": "chat", "confidence": 0.98, "reason": "greeting"}
+    # 2. Ends with a question mark AND no build verb in first 6 words: chat.
+    leading = " ".join(raw.split()[:6]).lower()
+    if any(h in lower for h in _QUESTION_HINTS) and not any(v in leading for v in _BUILD_VERBS):
+        return {"intent": "chat", "confidence": 0.85, "reason": "question"}
+    # 3. Clear build verb at the start: build.
+    first_word = raw.split()[0].lower().rstrip(",.!?")
+    if first_word in {"build", "create", "make", "generate", "design", "scaffold", "ship", "spin", "build me", "create me"}:
+        return {"intent": "build" if not has_prior_messages else "edit", "confidence": 0.95, "reason": "verb-start"}
+    # 4. Any build verb anywhere AND >5 words: build/edit.
+    if word_count > 5 and any(v in lower for v in _BUILD_VERBS):
+        return {"intent": "build" if not has_prior_messages else "edit", "confidence": 0.78, "reason": "verb-in-prompt"}
+    # 5. Very short non-question, no verb: chat (treat as ack/chitchat).
+    if word_count <= 6 and "?" not in raw:
+        return {"intent": "chat", "confidence": 0.7, "reason": "short-statement"}
+    # 6. Long descriptive prompt, no greeting, no question: assume build on
+    #    blank project, edit on existing.
+    if word_count >= 10:
+        return {"intent": "build" if not has_prior_messages else "edit", "confidence": 0.6, "reason": "long-descriptive"}
+    return {"intent": "ambiguous", "confidence": 0.4, "reason": "fallthrough"}
+
+
+
 def _looks_like_default_scaffold(files: list) -> bool:
     """Heuristic: a project is 'blank' if it only has the original default
     scaffold files (index.html + styles/main.css + scripts/app.js + README.md)
@@ -100,6 +164,123 @@ class DebugIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     error_text: Optional[str] = ""
     note: Optional[str] = ""
+
+
+
+async def _conversational_reply_stream(project_id: str, doc: dict, user_message: str, intent_info: dict):
+    """Stream a conversational SSE reply when the user isn't asking to build.
+
+    Wire format matches the existing chat stream just enough for the frontend
+    to render:
+      data: {"type": "start"}
+      data: {"type": "chunk", "delta": "..."}     (repeated)
+      data: {"type": "complete", "message": {...}, "intent": "chat"}
+    """
+    import asyncio
+    from fastapi.responses import StreamingResponse
+    from services.providers.registry import registry
+    from services.providers.base import RouteIntent
+
+    now = datetime.now(timezone.utc).isoformat()
+    user_msg_id = str(uuid.uuid4())
+    user_msg = {"id": user_msg_id, "role": "user", "content": user_message,
+                "explanation": None, "created_at": now}
+
+    # Persist the user message right away so reloads keep history.
+    try:
+        await db.projects.update_one(
+            {"id": project_id},
+            {"$push": {"messages": user_msg},
+             "$set": {"updated_at": now}},
+        )
+    except Exception:
+        pass
+
+    # Build a tight context for the model.
+    file_count = len(doc.get("files") or [])
+    project_name = doc.get("name") or "this project"
+    history = doc.get("messages") or []
+    history_lines = []
+    for m in history[-8:]:
+        role = "User" if m.get("role") == "user" else "Assistant"
+        content = (m.get("content") or "")[:600]
+        history_lines.append(f"{role}: {content}")
+    history_block = "\n".join(history_lines)
+
+    system_prompt = (
+        "You are the NXT One assistant — a friendly, direct, premium AI partner for founders "
+        "building software. The user is currently in the builder for project "
+        f"'{project_name}' (currently {file_count} files).\n\n"
+        "STYLE: warm but concise, founder-to-founder. No emoji clutter. No filler. "
+        "Be conversational, not robotic. Address what they're asking. "
+        "If they greet you, greet them back and ask what they want to build or change. "
+        "If they ask a question about the project / their codebase / a concept, answer it directly. "
+        "If they're hinting at a build request but it's vague, ask one clarifying question THEN "
+        "describe what you'll do — do NOT start generating code yet. "
+        "Never invent code blocks or file diffs in a conversational turn. "
+        "Keep replies under ~5 short lines unless they ask for detail."
+    )
+    user_prompt = (
+        (f"Recent chat:\n{history_block}\n\n" if history_block else "")
+        + f"User just said: {user_message.strip()[:2000]}\n\n"
+        "Respond conversationally. Do NOT produce code, file blocks, JSON, or markdown headings. "
+        "If they want you to build something, acknowledge it and outline the plan in 1-3 sentences "
+        "without writing the code — that step comes next."
+    )
+
+    async def event_gen():
+        yield f"data: {json.dumps({'type': 'start', 'mode': 'chat'})}\n\n"
+        try:
+            intent = RouteIntent(task="agent-router", routing_mode="auto", tier=None)
+            provider = registry.resolve(intent)
+            chunks: list[str] = []
+            try:
+                async for delta in provider.generate_stream(system_prompt, user_prompt, project_id):
+                    if not delta:
+                        continue
+                    chunks.append(delta)
+                    yield f"data: {json.dumps({'type': 'chunk', 'delta': delta})}\n\n"
+                    await asyncio.sleep(0)
+            except Exception:
+                # Fall back to blocking
+                text = await provider.generate(system_prompt, user_prompt, project_id)
+                chunks = [text or ""]
+                yield f"data: {json.dumps({'type': 'chunk', 'delta': text})}\n\n"
+            reply = "".join(chunks).strip() or "I'm here. What do you want to build today?"
+        except Exception as e:  # noqa: BLE001
+            reply = f"(Conversation fallback) {str(e)[:160]}"
+            yield f"data: {json.dumps({'type': 'chunk', 'delta': reply})}\n\n"
+
+        # Persist assistant message
+        assistant_msg = {
+            "id": str(uuid.uuid4()),
+            "role": "assistant",
+            "content": reply,
+            "explanation": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "mode": "chat",
+            "intent_info": intent_info,
+        }
+        try:
+            await db.projects.update_one(
+                {"id": project_id},
+                {"$push": {"messages": assistant_msg},
+                 "$set": {"updated_at": assistant_msg["created_at"]}},
+            )
+        except Exception:
+            pass
+        yield f"data: {json.dumps({'type': 'complete', 'message': assistant_msg, 'intent': 'chat'})}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
 
 
 # ---------- Runtime context (shared with AI prompt) ----------
@@ -187,6 +368,23 @@ async def chat_stream(project_id: str, body: ChatIn,
         raise HTTPException(status_code=404, detail="Project not found")
 
     runtime_ctx = _build_runtime_ctx(project_id, doc)
+
+    # Phase H — Conversational gate.
+    # If the user is just chatting (greeting, question, ack), DON'T fire the
+    # build pipeline. Stream a conversational reply via the provider and
+    # persist it as a normal assistant message. The build only runs when the
+    # user actually asks to create or edit something.
+    _prior_messages = doc.get("messages") or []
+    _has_prior_assistant = any(m.get("role") == "assistant" for m in _prior_messages)
+    _intent_info = classify_intent(body.message, has_prior_messages=_has_prior_assistant)
+    if _intent_info["intent"] in ("chat", "ambiguous"):
+        return await _conversational_reply_stream(
+            project_id=project_id,
+            doc=doc,
+            user_message=body.message,
+            intent_info=_intent_info,
+        )
+
 
     now = datetime.now(timezone.utc).isoformat()
     user_msg = {"id": str(uuid.uuid4()), "role": "user", "content": body.message,

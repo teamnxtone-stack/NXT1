@@ -1,3 +1,44 @@
+## 2026-05-15 — Platform polish pass (Phase H)
+
+### Conversational chat gate (most critical fix)
+- New `classify_intent(message, has_prior_messages)` in `routes/chat.py` — fast, deterministic classifier returning `build | edit | chat | ambiguous`. Greeting + question patterns short-circuit before the build pipeline ever fires.
+- New `_conversational_reply_stream()` — small SSE stream that uses the provider chain to send a natural conversational reply, persists it as a normal assistant message, and signals `complete` with `intent: "chat"`.
+- Frontend (`ChatPanel.jsx`): handles `start { mode: "chat" }`, accumulates `chunk { delta }` into a streaming assistant bubble, and finalises on `complete`.
+- Verified: `"hi"` / `"thanks"` / `"can you explain how this works?"` all reply conversationally; `"build me a landing page..."` still drives the full build.
+
+### Builder uploads — Photos vs Files (always visible)
+- `ChatPanel.jsx`: two separate buttons + hidden inputs.
+  - Photos: `accept="image/*"` (`Image` icon) — `data-testid="chat-photo-button"` / `chat-photo-input`.
+  - Files: `accept="video/*,.pdf,.doc,.docx,.csv,.json,.txt,.md,.rtf,.xls,.xlsx,.ppt,.pptx,.zip"` (`Paperclip` icon) — `data-testid="chat-upload-button"` / `chat-file-input`.
+  - Both buttons always rendered regardless of whether the user has typed.
+- `routes/assets.py::upload_asset`: 8MB ceiling → 64MB; adds `kind` field on the asset record (`image | video | audio | pdf | document | data | archive | file`) so downstream pipelines can branch on type.
+
+### Custom preview hostname (kill Emergent branding)
+- `services/preview_service.py::public_origin()` default now `https://nxtone.ai` (was `nxtone.tech`).
+- `build_url(slug, custom_host=...)` supports per-project custom hosts. Strips `http(s)://` and trailing `/` properly (previous `lstrip` was buggy).
+- `make_initial()` / `refresh()` carry `custom_host` through.
+- New `PreviewIn.custom_host` field in `routes/preview.py` — POST `/api/projects/{id}/preview` accepts `{"custom_host": "preview.client.com"}` and returns a URL rooted on that host.
+- Verified: `preview.client.com` → `https://preview.client.com/p/{slug}`; `https://demo.brand.io` → normalised to `demo.brand.io`.
+
+### Template variation (less repetitive AI output)
+- Added a VARIETY RULE block to `services/ai_service.py` system prompt:
+  - Forbids defaulting to the same hero pattern every build (lists alternates: left/right/center/split/full-image/video-bg/asymmetric).
+  - Lists palette options (editorial-print, neo-brutalist, glass/aurora, monochrome graphite, terminal-green, sunset-coral, midnight-electric).
+  - Instructs the model to let domain drive aesthetics; flags "dark gradient hero + 3 feature cards + CTA" as the failure mode.
+
+### Homepage — Jwood positioning
+- `LandingPage.jsx` subhead reworked to founder/private-platform tone.
+- Added "No credits. No tokens. Just build." line under the subhead.
+- Existing "A product of Jwood Technologies" signature preserved.
+
+### Deferred (will need a follow-up phase)
+- Light-mode pass is partial — added safety-net CSS earlier (overrides `text-white`, `text-zinc-*` Tailwind classes) but a per-component spacing/loading audit is still pending.
+- Full mobile-builder reformat: only the side-menu + bottom overflow patches are done; a dedicated mobile layout (collapsible panels, no broken overflow) requires deeper component work.
+- Web-asset pulling during generation (image search, font lookup, real demo content): not yet wired — would require a tool-call layer on top of the LLM.
+- Auto-fill empty input boxes with starter content across the entire app: only the workspace prompt suggestions chip-bar exists today; pulling generated defaults into every empty composer needs a separate pass.
+- Frontend page for agent threads (`/workspace/agents`): backend is durable + verified, but no React surface yet.
+
+
 ## 2026-05-14 — Phases F + G shipped
 
 ### Phase G — Durable agent_runs worker

@@ -32,14 +32,34 @@ async def upload_asset(project_id: str, file: UploadFile = File(...),
                        (file.filename or "asset").rsplit(".", 1)[0])[:40] or "asset"
     storage_path = f"{APP_NAME}/projects/{project_id}/{uuid.uuid4().hex[:12]}-{safe_name}.{ext}"
     data = await file.read()
-    if len(data) > 8 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 8MB)")
+    # 64MB ceiling — covers short videos + most PDFs/docs.
+    if len(data) > 64 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 64MB)")
     result = put_object(storage_path, data, file.content_type or "application/octet-stream")
+    # Discriminate the asset so the chat pipeline can reason about it.
+    ct = (file.content_type or "").lower()
+    if ct.startswith("image/"):
+        kind = "image"
+    elif ct.startswith("video/"):
+        kind = "video"
+    elif ct.startswith("audio/"):
+        kind = "audio"
+    elif "pdf" in ct or ext == "pdf":
+        kind = "pdf"
+    elif ext in {"doc", "docx", "rtf", "odt", "txt", "md"}:
+        kind = "document"
+    elif ext in {"csv", "xls", "xlsx", "tsv", "json"}:
+        kind = "data"
+    elif ext in {"zip", "tar", "gz"}:
+        kind = "archive"
+    else:
+        kind = "file"
     asset_record = {
         "id": str(uuid.uuid4()),
         "filename": f"{safe_name}.{ext}",
         "storage_path": result["path"],
         "content_type": file.content_type or "application/octet-stream",
+        "kind": kind,
         "size": result.get("size", len(data)),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
