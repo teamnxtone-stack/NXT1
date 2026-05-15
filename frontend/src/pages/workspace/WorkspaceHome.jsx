@@ -18,6 +18,7 @@ import {
   Globe,
   ArrowUp,
   Loader2,
+  Paperclip,
   UploadCloud,
   Github,
   LayoutTemplate,
@@ -104,6 +105,8 @@ export default function WorkspaceHome() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("fullstack");
   const [submitting, setSubmitting] = useState(false);
+  const [composerAttachments, setComposerAttachments] = useState([]); // {name, file, kind}
+  const [composerUploading, setComposerUploading] = useState(false);
   const [phIdx, setPhIdx] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -118,6 +121,25 @@ export default function WorkspaceHome() {
   // ZIP upload progress (0-100, null = idle)
   const [uploadProgress, setUploadProgress] = useState(null);
   const taRef = useRef(null);
+  const composerAttachRef = useRef(null);
+
+  const handleComposerAttach = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const next = files.map((f) => ({
+      name: f.name,
+      file: f,
+      kind: f.type.startsWith("image/")
+        ? "image"
+        : f.type.startsWith("video/")
+        ? "video"
+        : f.type.startsWith("audio/")
+        ? "audio"
+        : "file",
+    }));
+    setComposerAttachments((curr) => [...curr, ...next].slice(0, 8));
+    e.target.value = ""; // allow re-selecting same file
+  };
   const fileInputRef = useRef(null);
 
   // Load template catalogue lazily on first open of the sheet
@@ -284,6 +306,16 @@ export default function WorkspaceHome() {
         prompt: trimmed,
         mode,
       });
+      // Upload any composer attachments to the new project so the builder
+      // can reason on them on first chat.
+      if (composerAttachments.length > 0) {
+        setComposerUploading(true);
+        const { uploadAsset } = await import("@/lib/api");
+        await Promise.allSettled(
+          composerAttachments.map((a) => uploadAsset(data.id, a.file)),
+        );
+        setComposerUploading(false);
+      }
       // Auto-start the durable build pipeline so the planner/architect/coder
       // workflow lights up alongside the chat stream — visible inside
       // Builder → Tools → Build pipeline.
@@ -754,39 +786,27 @@ export default function WorkspaceHome() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            className="text-[32px] sm:text-[44px] font-semibold tracking-tight leading-[1.05] mb-3"
+            className="text-[34px] sm:text-[48px] font-semibold tracking-tight leading-[1.02] mb-4"
             style={{ color: "var(--nxt-fg)" }}
             data-testid="home-hero"
           >
             What will you build today?
           </motion.h1>
-          <p
-            className="text-[13.5px] sm:text-[14.5px] leading-relaxed max-w-[520px] mx-auto"
-            style={{ color: "var(--nxt-fg-dim)" }}
-          >
-            Pick a build type and describe it — NXT1 will scaffold, generate, preview and ship it.
-          </p>
-          <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => setShowImport(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11.5px] transition"
               style={{
                 background: "transparent",
                 border: "1px dashed var(--nxt-border)",
-                color: "var(--nxt-fg-dim)",
+                color: "var(--nxt-fg-faint)",
               }}
               data-testid="workspace-import-trigger"
             >
               <UploadCloud size={11} strokeWidth={2.2} />
-              Import existing project
-              <span className="opacity-50">·</span>
-              <span className="opacity-80">ZIP or GitHub</span>
+              Import existing
             </button>
-            {/* Template gallery is intentionally hidden from end users — the
-                12 scaffolds are selected internally by NXT1's inference layer
-                based on the prompt + chosen mode. The visible "Start from a
-                template" pill was removed per user direction. */}
           </div>
         </div>
       </div>
@@ -893,12 +913,42 @@ export default function WorkspaceHome() {
               data-testid="home-prompt-input"
             />
             <div className="px-3 pb-3 pt-1 flex items-center justify-between gap-2">
-              <span
-                className="mono text-[10px] tracking-[0.24em] uppercase"
-                style={{ color: "var(--nxt-fg-faint)" }}
-              >
-                ⌘ + ↵ to build
-              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={composerAttachRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.pdf,.doc,.docx,.csv,.json,.txt,.md,.rtf,.xls,.xlsx,.ppt,.pptx,.zip"
+                  className="hidden"
+                  onChange={handleComposerAttach}
+                  data-testid="home-attach-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => composerAttachRef.current?.click()}
+                  disabled={submitting || composerUploading}
+                  className="h-9 w-9 rounded-full inline-flex items-center justify-center transition disabled:opacity-50"
+                  style={{
+                    background: "var(--nxt-chip-bg)",
+                    color: "var(--nxt-fg-dim)",
+                    border: "1px solid var(--nxt-border-soft)",
+                  }}
+                  title="Attach photos, videos, PDFs, or documents"
+                  aria-label="Attach"
+                  data-testid="home-attach-button"
+                >
+                  {composerUploading
+                    ? <Loader2 size={14} className="animate-spin" />
+                    : <Paperclip size={14} strokeWidth={2.2} />}
+                </button>
+                {composerAttachments.length > 0 && (
+                  <span className="mono text-[10px] tracking-[0.18em] uppercase"
+                        style={{ color: "var(--nxt-fg-faint)" }}
+                        data-testid="home-attach-count">
+                    {composerAttachments.length} attached
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={handleSubmit}

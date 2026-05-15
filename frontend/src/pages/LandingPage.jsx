@@ -296,18 +296,10 @@ export default function LandingPage() {
         </div>
 
         <p
-          className="text-center text-[14px] sm:text-[15px] max-w-[560px] mx-auto mb-3 sm:mb-3 leading-relaxed"
+          className="text-center text-[14px] sm:text-[15px] max-w-[560px] mx-auto mb-5 sm:mb-6 leading-relaxed"
           style={{ color: "var(--nxt-fg-dim)" }}
         >
-          A private platform for founders, makers, and operators building MVPs,
-          internal tools, and real software — quietly, on their own terms.
-        </p>
-        <p
-          className="text-center mono text-[10.5px] sm:text-[11px] tracking-[0.28em] uppercase max-w-[480px] mx-auto mb-5 sm:mb-6"
-          style={{ color: "var(--nxt-fg-faint)" }}
-          data-testid="landing-no-credits"
-        >
-          No credits. No tokens. Just build.
+          A private platform for founders building software — quietly, on their own terms.
         </p>
 
         {/* Jwood Technologies signature — replaces the limited-access pill.
