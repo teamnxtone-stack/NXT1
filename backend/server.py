@@ -79,6 +79,7 @@ from routes.agent_memory import router as agent_memory_router  # noqa: E402
 from routes.notifications import router as notifications_router  # noqa: E402
 from routes.agent_threads import router as agent_threads_router  # noqa: E402
 from routes.public_chat import router as public_chat_router, admin_router as public_chat_admin_router  # noqa: E402
+from routes.bolt_proxy import router as bolt_proxy_router  # noqa: E402
 from services.social_scheduler import scheduler_loop as social_scheduler_loop  # noqa: E402
 from routes._deps import db as _shared_db  # noqa: E402
 
@@ -136,6 +137,7 @@ for r in (
     agent_threads_router,
     public_chat_router,
     public_chat_admin_router,
+    bolt_proxy_router,
 ):
     app.include_router(r)
 
