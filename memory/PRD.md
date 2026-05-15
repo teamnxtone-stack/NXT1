@@ -1,3 +1,46 @@
+## 2026-05-15 — Deep bolt.diy integration (single integrated app, not nested)
+
+### Problem
+After the iter9 migration the `/builder` page felt like two stacked products: NXT1's header on top, then bolt.diy's *whole* intro screen (logo + sidebar + "Where ideas begin" + "Guest User" + provider dropdown + its own chat composer) underneath. User demanded one unified app: NXT1 chat composer on the LEFT, bolt's Workbench (preview/code/terminal) on the RIGHT, no bolt chrome anywhere.
+
+### What shipped
+**Bolt sidecar — runs as a headless engine when `?headless=1`:**
+- `app/components/header/Header.tsx` — adds `data-nxt1-bolt-header` so SCSS can hide it.
+- `app/components/sidebar/Menu.client.tsx` — root motion.div gets `data-nxt1-bolt-menu` so it can be hidden.
+- `app/styles/index.scss` — adds an `html[data-nxt1-headless='1']` block that hides `[data-nxt1-bolt-header]`, `[data-nxt1-bolt-menu]`, `#intro` (the welcome splash); sets `--header-height: 0px` so the Workbench fills the iframe edge-to-edge; transparent body so NXT1 chrome shows through.
+- `app/root.tsx` — inline theme script flips `data-nxt1-headless='1'` when `URLSearchParams.get('headless')==='1'`.
+- `app/components/chat/Chat.client.tsx` — in headless mode forces `chatStore.showChat=false`, `chatStore.started=true`, `setChatStarted(true)`, `workbenchStore.showWorkbench.set(true)` so the Workbench mounts immediately. Locks provider to Anthropic + model to `claude-sonnet-4-20250514`. Installs `window.__nxt1BoltBridge = { ready, append, stop, getMessages, getIsLoading, subscribe }` and posts `{type:'nxt1-bolt-messages', messages, isLoading}` to `window.parent` on every store update.
+- `app/utils/constants.ts` — `DEFAULT_MODEL = 'claude-sonnet-4-20250514'`, `DEFAULT_PROVIDER` pinned to Anthropic.
+- `app/lib/modules/llm/providers/anthropic.ts` — claude-sonnet-4-20250514 added as first static model.
+
+**NXT1 — owns the entire left panel + drives bolt through the bridge:**
+- `frontend/src/pages/BuilderPage.jsx` — full rewrite. Split layout: 46% (max 540px) chat panel left, flex-1 bolt iframe right. NXT1 chat panel has its own header (Workspace back, NXT1 wordmark, bell, "New tab" link), message bubble list, and composer (textarea, attach button, send arrow, "Claude Sonnet 4 · locked" caption). Bolt iframe loads `/api/bolt-engine/?headless=1&project={id}` without the `credentialless` attribute (it's same-origin; credentialless under COI would 403 module fetches). On mount calls `ensureCoiServiceWorker()` and shows a "Reload to enable terminal" pill if the SW just installed.
+- Bridge polling + postMessage listener mirror bolt's message stream into NXT1 bubbles; new messages get auto-persisted via PUT to `/api/v1/builder/chat/{projectId}`.
+- `stripBoltMetaHeaders()` cleans bolt's `[Model: …]\n\n[Provider: …]\n\n` prefix off user bubbles so they look native.
+
+**Backend — Mongo-backed chat history:**
+- `routes/builder_chat.py` — GET / POST / PUT / DELETE `/api/v1/builder/chat/{project_id}`. Collection `builder_chats: {project_id, messages:[{id,role,content,ts}], updated_at}`. Pydantic-validated, _id excluded.
+
+### Verified via testing_agent iter10 (and re-verified after the credentialless fix)
+- Backend persistence: 7/7 pytest pass (`/app/backend/tests/test_iter10_builder_chat.py`).
+- Bolt proxy isolation regression-clean: COEP credentialless + COOP same-origin still set on both `/api/bolt-engine/` and `/api/bolt-engine/?headless=1`.
+- Inside iframe: `window.crossOriginIsolated === true`, `window.__nxt1BoltBridge` is an object with `ready:true`, Workbench mounts (Code/Diff/Preview tabs, Files sidebar, Bolt Terminal with `~/project` prompt), `[data-nxt1-bolt-header]` is `display:none`, `#intro` is gone.
+- Composer is enabled, "Claude Sonnet 4 · locked" caption shown.
+- Workspace / Social / Studio / Memory / Leads / Notifications / Landing + chat bubble all unchanged.
+
+### Critical fix found during iter10 testing
+- Removed `credentialless="true"` from the iframe element in `BuilderPage.jsx`. The iframe is **same-origin** with the parent; once the COI service worker activates the parent, a credentialless attribute on a same-origin iframe causes sub-resource fetches to drop credentials and the proxy 403s the JS module chunks. Without the attribute the iframe inherits its isolation context from the COI-isolated parent and module loading works.
+
+### Known follow-ups (deferred — explicitly told user)
+- Full WebContainer filesystem snapshot round-trip to Mongo so a returning user gets the exact file state across devices. Today bolt persists in-browser IndexedDB; files survive within a tab + cross-reload but not cross-device.
+- Replay persisted user prompts back into bolt's chat store on reopen (we currently only restore the bubbles in NXT1's panel — re-running bolt's pipeline on every reopen would burn the user's Anthropic budget, so by design we don't auto-resend).
+- Silence remaining cosmetic console errors from bolt (HMR wss probe; `fetchConfiguredProviders` 404). Non-functional.
+
+### Required for full end-to-end app generation
+- The user must set `ANTHROPIC_API_KEY=...` in `/app/backend/.env` and restart `bolt-engine` (bolt reads it from `process.env`). Without it, sending a prompt installs the user bubble fine but bolt's `/api/chat` returns no completion.
+
+
+
 ## 2026-05-15 — Full bolt.diy builder migration (replaces native builder)
 
 ### What shipped

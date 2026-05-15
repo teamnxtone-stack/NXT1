@@ -343,7 +343,6 @@ export default function BuilderPage() {
             src={iframeSrc}
             title="NXT1 Builder Workbench"
             allow="cross-origin-isolated; clipboard-read; clipboard-write"
-            credentialless="true"
             onLoad={() => setIframeReady(true)}
             className="w-full h-full border-0"
             data-testid="builder-iframe"
