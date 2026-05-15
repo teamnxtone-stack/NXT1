@@ -31,15 +31,36 @@ def public_origin() -> str:
 
     Resolution order:
       1. PREVIEW_PUBLIC_ORIGIN env (explicit override)
-      2. BACKEND_PUBLIC_ORIGIN env (legacy)
-      3. NXT One default: https://nxtone.ai
-    Emergent-managed hostnames are never used here.
+      2. BACKEND_PUBLIC_ORIGIN env (legacy alias)
+      3. PUBLIC_BACKEND_URL env, BUT ONLY if it's NOT an Emergent preview host
+         (so an old `setup-adjustments.preview.emergentagent.com` value never
+         leaks back into user-facing preview URLs)
+      4. NXT One platform default: https://nxtone.tech
     """
-    return (
-        os.environ.get("PREVIEW_PUBLIC_ORIGIN")
-        or os.environ.get("BACKEND_PUBLIC_ORIGIN")
-        or "https://nxtone.ai"
-    ).rstrip("/")
+    explicit = (os.environ.get("PREVIEW_PUBLIC_ORIGIN")
+                or os.environ.get("BACKEND_PUBLIC_ORIGIN")
+                or "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    pb = (os.environ.get("PUBLIC_BACKEND_URL") or "").strip()
+    if pb and "emergentagent" not in pb.lower() and "emergent.com" not in pb.lower():
+        return pb.rstrip("/")
+    return "https://nxtone.tech"
+
+
+def _sanitize_preview_url(url: Optional[str]) -> Optional[str]:
+    """Strip any leaked Emergent preview host from a stored URL by re-pointing
+    to the current platform origin. Keeps the slug + path intact."""
+    if not url:
+        return url
+    low = url.lower()
+    if "emergentagent" not in low and "emergent.com" not in low:
+        return url
+    # Find the /p/{slug...} suffix
+    idx = low.find("/p/")
+    if idx == -1:
+        return f"{public_origin()}/{url.split('/')[-1]}"
+    return f"{public_origin()}{url[idx:]}"
 
 
 def build_url(slug: str, *, custom_host: Optional[str] = None) -> str:
@@ -81,13 +102,16 @@ def make_initial(project_name: str, *, custom_host: Optional[str] = None) -> dic
 def refresh(existing: dict, *, custom_host: Optional[str] = None) -> dict:
     """Bump the build count + updated_at, keep the slug stable. Optionally
     re-issue the URL against a new custom host (e.g. the user just connected
-    `preview.client.com` to this project)."""
+    `preview.client.com` to this project). Also sanitizes any legacy URL
+    that still contains an Emergent host."""
     rec = dict(existing or {})
     rec["updated_at"] = now()
     rec["build_count"] = int(rec.get("build_count") or 0) + 1
     host = custom_host if custom_host is not None else rec.get("custom_host")
     if rec.get("slug"):
         rec["url"] = build_url(rec["slug"], custom_host=host)
+    else:
+        rec["url"] = _sanitize_preview_url(rec.get("url"))
     if custom_host is not None:
         rec["custom_host"] = custom_host
     return rec
@@ -99,6 +123,13 @@ def public_view(rec: dict) -> dict:
         return {}
     out = {k: v for k, v in rec.items() if k not in {"password", "password_hash"}}
     out["password_protected"] = bool(rec.get("password_hash"))
+    # Sanitize any legacy stored URL that still has an Emergent host.
+    # Prefer rebuilding from slug + (optional) custom_host so the URL always
+    # reflects the current platform origin.
+    if rec.get("slug"):
+        out["url"] = build_url(rec["slug"], custom_host=rec.get("custom_host"))
+    else:
+        out["url"] = _sanitize_preview_url(out.get("url"))
     return out
 
 
